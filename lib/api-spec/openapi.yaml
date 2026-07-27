@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: NANP Carrier Selection Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: recommend
+    description: Carrier recommendation operations
+  - name: options
+    description: Dropdown options
+  - name: stats
+    description: Database statistics
 paths:
   /healthz:
     get:
@@ -24,6 +30,70 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /recommend:
+    post:
+      operationId: getRecommendation
+      tags: [recommend]
+      summary: Get carrier recommendation
+      description: >
+        Accepts therapeutic nucleic acid, disease, and route of administration.
+        Queries the Supabase database for matching formulations and evidence,
+        then uses OpenAI to synthesize a recommendation grounded in retrieved records.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendationInput"
+      responses:
+        "200":
+          description: Structured carrier recommendation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendationResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /options:
+    get:
+      operationId: getOptions
+      tags: [options]
+      summary: Get dropdown options
+      description: Returns available nucleic acid types, diseases, and routes of administration
+      responses:
+        "200":
+          description: Available selection options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SelectionOptions"
+
+  /stats:
+    get:
+      operationId: getDatabaseStats
+      tags: [stats]
+      summary: Get database statistics
+      description: Returns summary statistics about the scientific literature database
+      responses:
+        "200":
+          description: Database statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +104,159 @@ components:
       required:
         - status
 
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    RecommendationInput:
+      type: object
+      required:
+        - nucleic_acid
+        - disease
+        - route_of_administration
+      properties:
+        nucleic_acid:
+          type: string
+          description: The therapeutic nucleic acid type (e.g. mRNA, siRNA, pDNA)
+        disease:
+          type: string
+          description: The target disease or condition
+        route_of_administration:
+          type: string
+          description: The intended delivery route (e.g. intravenous, intramuscular)
+
+    RecommendationResult:
+      type: object
+      required:
+        - recommended_carrier
+        - confidence
+        - scientific_rationale
+        - key_components
+        - advantages
+        - limitations
+        - supporting_mechanisms
+        - supporting_publications
+        - alternative_formulations
+      properties:
+        recommended_carrier:
+          type: string
+          description: Name of the top recommended carrier formulation
+        confidence:
+          type: string
+          enum: [high, moderate, low]
+          description: Confidence level of the recommendation
+        scientific_rationale:
+          type: string
+          description: Detailed scientific explanation of why this carrier was selected
+        key_components:
+          type: array
+          items:
+            type: string
+          description: Key material components of the recommended carrier
+        advantages:
+          type: array
+          items:
+            type: string
+          description: Advantages of the recommended carrier for this use case
+        limitations:
+          type: array
+          items:
+            type: string
+          description: Known limitations and challenges
+        supporting_mechanisms:
+          type: array
+          items:
+            type: string
+          description: Biological and physicochemical mechanisms supporting the recommendation
+        supporting_publications:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportingPublication"
+          description: Database records supporting the recommendation
+        alternative_formulations:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlternativeFormulation"
+          description: Other viable carrier formulations considered
+
+    SupportingPublication:
+      type: object
+      required:
+        - title
+        - relevance
+      properties:
+        paper_id:
+          type: ["integer", "null"]
+        title:
+          type: string
+        authors:
+          type: ["string", "null"]
+        journal:
+          type: ["string", "null"]
+        year:
+          type: ["integer", "null"]
+        doi:
+          type: ["string", "null"]
+        relevance:
+          type: string
+          description: How this paper supports the recommendation
+
+    AlternativeFormulation:
+      type: object
+      required:
+        - name
+        - rationale
+      properties:
+        name:
+          type: string
+        materials:
+          type: array
+          items:
+            type: string
+        rationale:
+          type: string
+          description: Why this is a viable alternative
+
+    SelectionOptions:
+      type: object
+      required:
+        - nucleic_acids
+        - diseases
+        - routes_of_administration
+      properties:
+        nucleic_acids:
+          type: array
+          items:
+            type: string
+        diseases:
+          type: array
+          items:
+            type: string
+        routes_of_administration:
+          type: array
+          items:
+            type: string
+
+    DatabaseStats:
+      type: object
+      required:
+        - total_papers
+        - total_formulations
+        - total_materials
+        - total_experiments
+        - total_biological_outcomes
+      properties:
+        total_papers:
+          type: integer
+        total_formulations:
+          type: integer
+        total_materials:
+          type: integer
+        total_experiments:
+          type: integer
+        total_biological_outcomes:
+          type: integer

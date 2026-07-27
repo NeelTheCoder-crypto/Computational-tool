@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "NANP Carrier Selection Platform"
+version = "1.0.0"
+id = "artifacts/nanp-app"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20690
+
+[services.development]
+run = "pnpm --filter @workspace/nanp-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/nanp-app", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/nanp-app/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20690"
+BASE_PATH = "/"

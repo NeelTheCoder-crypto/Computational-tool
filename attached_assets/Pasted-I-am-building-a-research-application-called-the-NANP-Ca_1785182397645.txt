@@ -1,0 +1,180 @@
+I am building a research application called the NANP Carrier Selection Platform.
+
+The application will use a normalized PostgreSQL/Supabase database containing scientific literature on nucleic acid delivery carriers.
+
+The database already exists.
+
+The primary tables include:
+
+papers
+formulations
+materials
+formulation_materials
+cargos
+formulation_cargos
+experiments
+experimental_conditions
+experimental_arms
+physicochemical_measurements
+biological_outcomes
+mechanisms
+limitations
+formulation_targeting
+formulation_processes
+models
+
+Build the application end-to-end.
+
+Goal
+
+The user should enter:
+
+Therapeutic nucleic acid
+Disease
+Route of administration
+
+The application should:
+
+Send the request to a backend API.
+Use an OpenAI model to interpret the user's request and determine the desired carrier properties.
+Query the Supabase database for formulations, materials, outcomes, mechanisms, limitations, and supporting evidence relevant to those desired properties.
+Return the retrieved scientific records to the OpenAI model.
+Have the OpenAI model synthesize a recommendation using ONLY the retrieved database records.
+Display the recommendation in a clean scientific interface.
+
+The OpenAI model must NEVER invent formulations or scientific evidence.
+All recommendations must be traceable to retrieved database records.
+
+Tech Stack
+
+Use:
+
+React
+TypeScript
+Vite
+Express
+Node.js
+Supabase
+OpenAI API
+Application Architecture
+
+Create:
+
+Frontend
+
+Three dropdowns:
+Therapeutic nucleic acid
+Disease
+Route of administration
+Analyze button
+Results page
+
+Backend
+
+Create an Express API:
+
+POST /recommend
+
+The endpoint should:
+
+receive the user inputs
+call OpenAI to interpret the request
+query Supabase
+retrieve matching records
+send the retrieved records back to OpenAI
+return a structured response
+Retrieval Layer
+
+Build reusable query functions such as:
+
+getFormulations()
+
+getMaterials()
+
+getOutcomes()
+
+getMechanisms()
+
+getLimitations()
+
+getSupportingPapers()
+
+These should use joins across the normalized database.
+
+OpenAI Prompt
+
+The OpenAI model should act as a scientific reasoning engine.
+
+It should:
+
+identify desired carrier characteristics
+compare retrieved formulations
+explain tradeoffs
+summarize supporting evidence
+never fabricate scientific information
+cite supporting papers from the database
+Results Page
+
+Display:
+
+Recommended Carrier
+
+Confidence
+
+Scientific Rationale
+
+Key Components
+
+Supporting Mechanisms
+
+Advantages
+
+Limitations
+
+Supporting Publications
+
+Alternative Formulations
+
+Build the application with clean, modular architecture so that future machine learning models can replace the retrieval logic without changing the frontend.
+
+One thing I'd change
+
+There is one architectural improvement I'd make over this prompt.
+
+Don't let GPT directly decide which SQL queries to run.
+
+Instead:
+
+User
+
+↓
+
+Backend
+
+↓
+
+Query Builder
+
+↓
+
+Supabase
+
+↓
+
+Retrieved Evidence
+
+↓
+
+GPT
+
+↓
+
+Final Answer
+
+In other words, your backend owns the database access, and GPT only reasons over the evidence it receives.
+
+This has three major benefits:
+
+Security – GPT never has direct database credentials.
+Reliability – You control exactly which records are retrieved.
+Scalability – As your database grows from 38 papers to hundreds or thousands, you can improve retrieval (e.g., better ranking, embeddings, hybrid search) without changing the frontend or the LLM prompt.

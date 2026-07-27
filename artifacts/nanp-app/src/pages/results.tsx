@@ -10,7 +10,7 @@ import {
   ArrowLeft, FileText, Beaker, CheckCircle2, XCircle, 
   Dna, Database, BookOpen, AlertCircle
 } from 'lucide-react';
-import type { RecommendationResult } from '@workspace/api-client-react/src/generated/api.schemas';
+import type { RecommendationResult } from '@workspace/api-client-react';
 
 const LOADING_MESSAGES = [
   "Querying scientific literature database...",
@@ -51,22 +51,20 @@ export default function Results() {
   }, [query, getRecommendation, setLocation]);
 
   useEffect(() => {
-    if (getRecommendation.isPending) {
-      const interval = setInterval(() => {
-        setLoadingMsgIdx((prev) => (prev + 1) % LOADING_MESSAGES.length);
-      }, 3000);
-      
-      const progressInterval = setInterval(() => {
-        setProgress(p => Math.min(p + (100 / 150), 95)); // roughly 15 seconds to 95%
-      }, 100);
-
-      return () => {
-        clearInterval(interval);
-        clearInterval(progressInterval);
-      };
-    } else {
+    if (!getRecommendation.isPending) {
       setProgress(100);
+      return;
     }
+    const interval = setInterval(() => {
+      setLoadingMsgIdx((prev) => (prev + 1) % LOADING_MESSAGES.length);
+    }, 3000);
+    const progressInterval = setInterval(() => {
+      setProgress((p) => Math.min(p + 100 / 150, 95));
+    }, 100);
+    return () => {
+      clearInterval(interval);
+      clearInterval(progressInterval);
+    };
   }, [getRecommendation.isPending]);
 
   const handleNewAnalysis = () => {

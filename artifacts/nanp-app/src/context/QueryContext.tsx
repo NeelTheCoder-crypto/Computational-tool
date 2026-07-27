@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import type { RecommendationInput } from '@workspace/api-client-react/src/generated/api.schemas';
+import type { RecommendationInput } from '@workspace/api-client-react';
 
 interface QueryContextType {
   query: RecommendationInput | null;

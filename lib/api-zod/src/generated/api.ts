@@ -53,13 +53,29 @@ export const GetRecommendationResponse = zod.object({
 
 
 /**
- * Returns available nucleic acid types, diseases, and routes of administration
- * @summary Get dropdown options
+ * Returns distinct cargo types from the database, deduplicated and alphabetized
+ * @summary Get nucleic acid / cargo types
  */
-export const GetOptionsResponse = zod.object({
-  "nucleic_acids": zod.array(zod.string()),
-  "diseases": zod.array(zod.string()),
-  "routes_of_administration": zod.array(zod.string())
+export const GetCargoOptionsResponse = zod.object({
+  "values": zod.array(zod.string()).describe('Distinct values from the database, alphabetically sorted')
+})
+
+
+/**
+ * Returns distinct disease models from the database, deduplicated and alphabetized
+ * @summary Get disease / disease model values
+ */
+export const GetDiseaseOptionsResponse = zod.object({
+  "values": zod.array(zod.string()).describe('Distinct values from the database, alphabetically sorted')
+})
+
+
+/**
+ * Returns distinct routes of administration from the database, deduplicated and alphabetized
+ * @summary Get routes of administration
+ */
+export const GetRouteOptionsResponse = zod.object({
+  "values": zod.array(zod.string()).describe('Distinct values from the database, alphabetically sorted')
 })
 
 

@@ -23,9 +23,9 @@ import type {
   ApiError,
   DatabaseStats,
   HealthStatus,
+  OptionList,
   RecommendationInput,
-  RecommendationResult,
-  SelectionOptions
+  RecommendationResult
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -205,21 +205,21 @@ export const useGetRecommendation = <TError = ErrorType<ApiError>,
       return useMutation(getGetRecommendationMutationOptions(options));
     }
 
-export const getGetOptionsUrl = () => {
+export const getGetCargoOptionsUrl = () => {
 
 
 
 
-  return `/api/options`
+  return `/api/options/cargos`
 }
 
 /**
- * Returns available nucleic acid types, diseases, and routes of administration
- * @summary Get dropdown options
+ * Returns distinct cargo types from the database, deduplicated and alphabetized
+ * @summary Get nucleic acid / cargo types
  */
-export const getOptions = async ( options?: RequestInit): Promise<SelectionOptions> => {
+export const getCargoOptions = async ( options?: RequestInit): Promise<OptionList> => {
 
-  return customFetch<SelectionOptions>(getGetOptionsUrl(),
+  return customFetch<OptionList>(getGetCargoOptionsUrl(),
   {
     ...options,
     method: 'GET'
@@ -232,45 +232,201 @@ export const getOptions = async ( options?: RequestInit): Promise<SelectionOptio
 
 
 
-export const getGetOptionsQueryKey = () => {
+export const getGetCargoOptionsQueryKey = () => {
     return [
-    `/api/options`
+    `/api/options/cargos`
     ] as const;
     }
 
 
-export const getGetOptionsQueryOptions = <TData = Awaited<ReturnType<typeof getOptions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetCargoOptionsQueryOptions = <TData = Awaited<ReturnType<typeof getCargoOptions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCargoOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetOptionsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetCargoOptionsQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOptions>>> = ({ signal }) => getOptions({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCargoOptions>>> = ({ signal }) => getCargoOptions({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOptions>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCargoOptions>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetOptionsQueryResult = NonNullable<Awaited<ReturnType<typeof getOptions>>>
-export type GetOptionsQueryError = ErrorType<unknown>
+export type GetCargoOptionsQueryResult = NonNullable<Awaited<ReturnType<typeof getCargoOptions>>>
+export type GetCargoOptionsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get dropdown options
+ * @summary Get nucleic acid / cargo types
  */
 
-export function useGetOptions<TData = Awaited<ReturnType<typeof getOptions>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetCargoOptions<TData = Awaited<ReturnType<typeof getCargoOptions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCargoOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetOptionsQueryOptions(options)
+  const queryOptions = getGetCargoOptionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDiseaseOptionsUrl = () => {
+
+
+
+
+  return `/api/options/diseases`
+}
+
+/**
+ * Returns distinct disease models from the database, deduplicated and alphabetized
+ * @summary Get disease / disease model values
+ */
+export const getDiseaseOptions = async ( options?: RequestInit): Promise<OptionList> => {
+
+  return customFetch<OptionList>(getGetDiseaseOptionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDiseaseOptionsQueryKey = () => {
+    return [
+    `/api/options/diseases`
+    ] as const;
+    }
+
+
+export const getGetDiseaseOptionsQueryOptions = <TData = Awaited<ReturnType<typeof getDiseaseOptions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDiseaseOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDiseaseOptionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDiseaseOptions>>> = ({ signal }) => getDiseaseOptions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDiseaseOptions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDiseaseOptionsQueryResult = NonNullable<Awaited<ReturnType<typeof getDiseaseOptions>>>
+export type GetDiseaseOptionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get disease / disease model values
+ */
+
+export function useGetDiseaseOptions<TData = Awaited<ReturnType<typeof getDiseaseOptions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDiseaseOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDiseaseOptionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetRouteOptionsUrl = () => {
+
+
+
+
+  return `/api/options/routes`
+}
+
+/**
+ * Returns distinct routes of administration from the database, deduplicated and alphabetized
+ * @summary Get routes of administration
+ */
+export const getRouteOptions = async ( options?: RequestInit): Promise<OptionList> => {
+
+  return customFetch<OptionList>(getGetRouteOptionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRouteOptionsQueryKey = () => {
+    return [
+    `/api/options/routes`
+    ] as const;
+    }
+
+
+export const getGetRouteOptionsQueryOptions = <TData = Awaited<ReturnType<typeof getRouteOptions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRouteOptionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRouteOptions>>> = ({ signal }) => getRouteOptions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRouteOptions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRouteOptionsQueryResult = NonNullable<Awaited<ReturnType<typeof getRouteOptions>>>
+export type GetRouteOptionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get routes of administration
+ */
+
+export function useGetRouteOptions<TData = Awaited<ReturnType<typeof getRouteOptions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRouteOptionsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

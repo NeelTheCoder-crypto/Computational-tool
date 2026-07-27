@@ -78,10 +78,9 @@ export interface RecommendationResult {
   alternative_formulations: AlternativeFormulation[];
 }
 
-export interface SelectionOptions {
-  nucleic_acids: string[];
-  diseases: string[];
-  routes_of_administration: string[];
+export interface OptionList {
+  /** Distinct values from the database, alphabetically sorted */
+  values: string[];
 }
 
 export interface DatabaseStats {

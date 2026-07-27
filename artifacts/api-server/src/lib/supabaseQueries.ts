@@ -248,95 +248,34 @@ export async function getPhysicochemicalMeasurements(): Promise<
   }));
 }
 
-/** Get distinct dropdown options by querying the actual data */
-export async function getDropdownOptions(): Promise<{
-  nucleic_acids: string[];
-  diseases: string[];
-  routes_of_administration: string[];
-}> {
-  // Nucleic acid types from cargos table
-  const { data: cargoData } = await supabase
+/** Distinct cargo / nucleic acid types from the cargos table */
+export async function getCargos(): Promise<string[]> {
+  const { data, error } = await supabase
     .from("cargos")
     .select("cargo_type")
     .not("cargo_type", "is", null);
+  if (error || !data) return [];
+  return Array.from(new Set(data.map((r) => r.cargo_type as string).filter(Boolean))).sort();
+}
 
-  // Disease/condition from experimental_conditions
-  const { data: conditionData } = await supabase
+/** Distinct disease models from experimental_conditions */
+export async function getDiseases(): Promise<string[]> {
+  const { data, error } = await supabase
     .from("experimental_conditions")
     .select("disease_model")
     .not("disease_model", "is", null);
+  if (error || !data) return [];
+  return Array.from(new Set(data.map((r) => r.disease_model as string).filter(Boolean))).sort();
+}
 
-  // Route of administration from experimental_conditions
-  const { data: routeData } = await supabase
+/** Distinct routes of administration from experimental_conditions */
+export async function getRoutes(): Promise<string[]> {
+  const { data, error } = await supabase
     .from("experimental_conditions")
     .select("route_of_administration")
     .not("route_of_administration", "is", null);
-
-  const nucleic_acids = Array.from(
-    new Set(
-      (cargoData || [])
-        .map((c) => c.cargo_type as string)
-        .filter(Boolean)
-    )
-  ).sort();
-
-  const diseases = Array.from(
-    new Set(
-      (conditionData || [])
-        .map((c) => c.disease_model as string)
-        .filter(Boolean)
-    )
-  ).sort();
-
-  const routes_of_administration = Array.from(
-    new Set(
-      (routeData || [])
-        .map((r) => r.route_of_administration as string)
-        .filter(Boolean)
-    )
-  ).sort();
-
-  // If DB doesn't have data yet, return common defaults
-  return {
-    nucleic_acids:
-      nucleic_acids.length > 0
-        ? nucleic_acids
-        : [
-            "mRNA",
-            "siRNA",
-            "pDNA",
-            "miRNA",
-            "antisense oligonucleotide (ASO)",
-            "saRNA",
-            "sgRNA",
-            "shRNA",
-          ],
-    diseases:
-      diseases.length > 0
-        ? diseases
-        : [
-            "cancer",
-            "inflammatory disease",
-            "genetic disorder",
-            "infectious disease",
-            "cardiovascular disease",
-            "neurological disorder",
-            "metabolic disease",
-          ],
-    routes_of_administration:
-      routes_of_administration.length > 0
-        ? routes_of_administration
-        : [
-            "intravenous",
-            "intramuscular",
-            "subcutaneous",
-            "intranasal",
-            "intratumoral",
-            "oral",
-            "intraperitoneal",
-            "intraocular",
-          ],
-  };
+  if (error || !data) return [];
+  return Array.from(new Set(data.map((r) => r.route_of_administration as string).filter(Boolean))).sort();
 }
 
 /** Get database statistics */

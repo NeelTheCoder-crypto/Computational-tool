@@ -66,19 +66,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
-  /options:
+  /options/cargos:
     get:
-      operationId: getOptions
+      operationId: getCargoOptions
       tags: [options]
-      summary: Get dropdown options
-      description: Returns available nucleic acid types, diseases, and routes of administration
+      summary: Get nucleic acid / cargo types
+      description: Returns distinct cargo types from the database, deduplicated and alphabetized
       responses:
         "200":
-          description: Available selection options
+          description: List of cargo types
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SelectionOptions"
+                $ref: "#/components/schemas/OptionList"
+
+  /options/diseases:
+    get:
+      operationId: getDiseaseOptions
+      tags: [options]
+      summary: Get disease / disease model values
+      description: Returns distinct disease models from the database, deduplicated and alphabetized
+      responses:
+        "200":
+          description: List of disease values
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OptionList"
+
+  /options/routes:
+    get:
+      operationId: getRouteOptions
+      tags: [options]
+      summary: Get routes of administration
+      description: Returns distinct routes of administration from the database, deduplicated and alphabetized
+      responses:
+        "200":
+          description: List of route values
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OptionList"
 
   /stats:
     get:
@@ -221,25 +249,16 @@ components:
           type: string
           description: Why this is a viable alternative
 
-    SelectionOptions:
+    OptionList:
       type: object
       required:
-        - nucleic_acids
-        - diseases
-        - routes_of_administration
+        - values
       properties:
-        nucleic_acids:
+        values:
           type: array
           items:
             type: string
-        diseases:
-          type: array
-          items:
-            type: string
-        routes_of_administration:
-          type: array
-          items:
-            type: string
+          description: Distinct values from the database, alphabetically sorted
 
     DatabaseStats:
       type: object

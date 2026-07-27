@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SelectionOptions {
-  nucleic_acids: string[];
-  diseases: string[];
-  routes_of_administration: string[];
+export interface OptionList {
+  /** Distinct values from the database, alphabetically sorted */
+  values: string[];
 }

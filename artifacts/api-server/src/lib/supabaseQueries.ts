@@ -258,24 +258,33 @@ export async function getCargos(): Promise<string[]> {
   return Array.from(new Set(data.map((r) => r.cargo_type as string).filter(Boolean))).sort();
 }
 
-/** Distinct disease models from experimental_conditions */
+/** Distinct disease models from the models table */
 export async function getDiseases(): Promise<string[]> {
   const { data, error } = await supabase
-    .from("experimental_conditions")
+    .from("models")
     .select("disease_model")
     .not("disease_model", "is", null);
   if (error || !data) return [];
   return Array.from(new Set(data.map((r) => r.disease_model as string).filter(Boolean))).sort();
 }
 
-/** Distinct routes of administration from experimental_conditions */
+/** Distinct routes of administration from experimental_arms and formulations */
 export async function getRoutes(): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("experimental_conditions")
-    .select("route_of_administration")
-    .not("route_of_administration", "is", null);
-  if (error || !data) return [];
-  return Array.from(new Set(data.map((r) => r.route_of_administration as string).filter(Boolean))).sort();
+  const [armsResult, formulationsResult] = await Promise.all([
+    supabase
+      .from("experimental_arms")
+      .select("administration_route")
+      .not("administration_route", "is", null),
+    supabase
+      .from("formulations")
+      .select("intended_route")
+      .not("intended_route", "is", null),
+  ]);
+  const routes = [
+    ...((armsResult.data ?? []).map((r) => r.administration_route as string)),
+    ...((formulationsResult.data ?? []).map((r) => r.intended_route as string)),
+  ];
+  return Array.from(new Set(routes.filter(Boolean))).sort();
 }
 
 /** Get database statistics */

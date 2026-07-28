@@ -297,17 +297,11 @@ export async function getDatabaseStatistics(): Promise<{
 }> {
   const [papers, formulations, materials, experiments, outcomes] =
     await Promise.all([
-      supabase.from("papers").select("id", { count: "exact", head: true }),
-      supabase
-        .from("formulations")
-        .select("id", { count: "exact", head: true }),
-      supabase.from("materials").select("id", { count: "exact", head: true }),
-      supabase
-        .from("experiments")
-        .select("id", { count: "exact", head: true }),
-      supabase
-        .from("biological_outcomes")
-        .select("id", { count: "exact", head: true }),
+      supabase.from("papers").select("*", { count: "exact", head: true }),
+      supabase.from("formulations").select("*", { count: "exact", head: true }),
+      supabase.from("materials").select("*", { count: "exact", head: true }),
+      supabase.from("experiments").select("*", { count: "exact", head: true }),
+      supabase.from("biological_outcomes").select("*", { count: "exact", head: true }),
     ]);
 
   return {

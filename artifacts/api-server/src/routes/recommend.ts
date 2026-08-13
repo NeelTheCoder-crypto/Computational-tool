@@ -8,6 +8,13 @@ import {
   getLimitations,
   getSupportingPapers,
   getPhysicochemicalMeasurements,
+  type FormulationRecord,
+  type MaterialRecord,
+  type OutcomeRecord,
+  type MechanismRecord,
+  type LimitationRecord,
+  type PaperRecord,
+  type PhysicochemicalRecord,
 } from "../lib/supabaseQueries.js";
 import { GetRecommendationBody } from "@workspace/api-zod";
 
@@ -27,35 +34,42 @@ router.post("/recommend", async (req, res): Promise<void> => {
     "Processing recommendation request"
   );
 
-  // Step 1: Retrieve all relevant evidence from Supabase
-  const [
-    formulations,
-    materials,
-    outcomes,
-    mechanisms,
-    limitations,
-    papers,
-    measurements,
-  ] = await Promise.all([
-    getFormulations(),
-    getMaterials(),
-    getOutcomes(),
-    getMechanisms(),
-    getLimitations(),
-    getSupportingPapers(),
-    getPhysicochemicalMeasurements(),
-  ]);
+  // Step 1: Retrieve formulations matching the nucleic acid cargo type
+  const formulations = await getFormulations(nucleic_acid);
+
+  const formulationIds = formulations.map((f) => f.id);
+  const paperIds = [...new Set(formulations.map((f) => f.paper_id).filter(Boolean) as string[])];
+
+  req.log.info(
+    { formulations: formulations.length, paperIds: paperIds.length },
+    "Formulations retrieved"
+  );
+
+  // Step 2: Retrieve all related evidence in parallel, scoped to matched formulations
+  const [materials, outcomes, mechanisms, limitations, papers, measurements] =
+    await Promise.all([
+      getMaterials(formulationIds),
+      getOutcomes(formulationIds),
+      getMechanisms(formulationIds),
+      getLimitations(formulationIds),
+      getSupportingPapers(paperIds),
+      getPhysicochemicalMeasurements(formulationIds),
+    ]);
 
   req.log.info(
     {
       formulations: formulations.length,
-      papers: papers.length,
+      materials: materials.length,
       outcomes: outcomes.length,
+      mechanisms: mechanisms.length,
+      limitations: limitations.length,
+      papers: papers.length,
+      measurements: measurements.length,
     },
     "Evidence retrieved from database"
   );
 
-  // Step 2: Build evidence context for the LLM
+  // Step 3: Build evidence context for the LLM
   const evidenceContext = buildEvidenceContext({
     formulations,
     materials,
@@ -66,7 +80,7 @@ router.post("/recommend", async (req, res): Promise<void> => {
     measurements,
   });
 
-  // Step 3: Call OpenAI with structured evidence — LLM only reasons, never invents
+  // Step 4: Call OpenAI — LLM reasons over retrieved evidence, never invents
   const systemPrompt = `You are a scientific reasoning engine for the NANP Carrier Selection Platform.
 Your role is to analyze retrieved scientific database records and synthesize a carrier recommendation.
 
@@ -74,8 +88,8 @@ CRITICAL RULES:
 1. You MUST base ALL recommendations EXCLUSIVELY on the retrieved database records provided below.
 2. You MUST NEVER invent, fabricate, or extrapolate formulations, materials, or scientific claims not present in the database.
 3. Every claim must be traceable to the retrieved evidence.
-4. If the database contains insufficient evidence for a confident recommendation, lower the confidence score accordingly.
-5. Cite specific papers from the Supporting Papers section by their ID and title.
+4. If the database contains insufficient evidence for a confident recommendation, lower the confidence score accordingly — but still recommend the best-supported option from the data.
+5. Cite specific papers from the Supporting Papers section by their title.
 
 You will return a JSON object (no markdown, raw JSON only) with this exact structure:
 {
@@ -88,7 +102,7 @@ You will return a JSON object (no markdown, raw JSON only) with this exact struc
   "supporting_mechanisms": ["string array of delivery mechanisms from the database"],
   "supporting_publications": [
     {
-      "paper_id": number or null,
+      "paper_id": "string or null",
       "title": "string",
       "authors": "string or null",
       "journal": "string or null",
@@ -108,13 +122,13 @@ You will return a JSON object (no markdown, raw JSON only) with this exact struc
 
   const userPrompt = `USER REQUEST:
 - Therapeutic nucleic acid: ${nucleic_acid}
-- Target disease: ${disease}
+- Target disease / disease model: ${disease}
 - Route of administration: ${route_of_administration}
 
 RETRIEVED DATABASE EVIDENCE:
 ${evidenceContext}
 
-Based ONLY on the above retrieved records, synthesize a carrier recommendation. Return raw JSON only.`;
+Based ONLY on the above retrieved records, synthesize the best carrier recommendation. Return raw JSON only.`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-5.6-terra",
@@ -127,10 +141,8 @@ Based ONLY on the above retrieved records, synthesize a carrier recommendation. 
 
   const rawContent = completion.choices[0]?.message?.content ?? "";
 
-  // Parse the JSON response from the LLM
   let recommendation;
   try {
-    // Strip any accidental markdown code fences
     const cleaned = rawContent
       .replace(/^```json\s*/i, "")
       .replace(/^```\s*/i, "")
@@ -139,9 +151,7 @@ Based ONLY on the above retrieved records, synthesize a carrier recommendation. 
     recommendation = JSON.parse(cleaned);
   } catch {
     req.log.error({ rawContent }, "Failed to parse LLM response as JSON");
-    res.status(500).json({
-      error: "Failed to parse recommendation from AI model",
-    });
+    res.status(500).json({ error: "Failed to parse recommendation from AI model" });
     return;
   }
 
@@ -154,38 +164,22 @@ Based ONLY on the above retrieved records, synthesize a carrier recommendation. 
 });
 
 function buildEvidenceContext(evidence: {
-  formulations: ReturnType<typeof getFormulations> extends Promise<infer T>
-    ? T
-    : never;
-  materials: ReturnType<typeof getMaterials> extends Promise<infer T>
-    ? T
-    : never;
-  outcomes: ReturnType<typeof getOutcomes> extends Promise<infer T>
-    ? T
-    : never;
-  mechanisms: ReturnType<typeof getMechanisms> extends Promise<infer T>
-    ? T
-    : never;
-  limitations: ReturnType<typeof getLimitations> extends Promise<infer T>
-    ? T
-    : never;
-  papers: ReturnType<typeof getSupportingPapers> extends Promise<infer T>
-    ? T
-    : never;
-  measurements: ReturnType<
-    typeof getPhysicochemicalMeasurements
-  > extends Promise<infer T>
-    ? T
-    : never;
+  formulations: FormulationRecord[];
+  materials: MaterialRecord[];
+  outcomes: OutcomeRecord[];
+  mechanisms: MechanismRecord[];
+  limitations: LimitationRecord[];
+  papers: PaperRecord[];
+  measurements: PhysicochemicalRecord[];
 }): string {
   const sections: string[] = [];
 
-  // Formulations
   if (evidence.formulations.length > 0) {
     sections.push("=== FORMULATIONS ===");
-    for (const f of evidence.formulations.slice(0, 50)) {
+    for (const f of evidence.formulations) {
       sections.push(
-        `[ID:${f.id}] ${f.name ?? "Unnamed"} (${f.formulation_type ?? "type unknown"})\n` +
+        `[${f.name ?? "Unnamed"}] ${f.carrier_family ?? ""}${f.carrier_subtype ? " / " + f.carrier_subtype : ""}\n` +
+          `  Route: ${f.intended_route ?? "N/A"}\n` +
           `  Description: ${f.description ?? "N/A"}\n` +
           `  Cargo types: ${f.cargo_types.join(", ") || "N/A"}\n` +
           `  Materials: ${f.material_names.join(", ") || "N/A"}\n` +
@@ -195,72 +189,67 @@ function buildEvidenceContext(evidence: {
     }
   }
 
-  // Materials
   if (evidence.materials.length > 0) {
     sections.push("\n=== MATERIALS ===");
-    for (const m of evidence.materials.slice(0, 80)) {
+    for (const m of evidence.materials) {
       sections.push(
-        `[ID:${m.id}] ${m.name ?? "Unnamed"} (${m.material_type ?? "unknown type"}): ${m.description ?? "N/A"}`
+        `${m.name ?? "Unnamed"} (${m.material_class ?? "unknown class"})${m.notes ? ": " + m.notes : ""}`
       );
     }
   }
 
-  // Biological outcomes
   if (evidence.outcomes.length > 0) {
     sections.push("\n=== BIOLOGICAL OUTCOMES ===");
-    for (const o of evidence.outcomes.slice(0, 80)) {
+    for (const o of evidence.outcomes) {
+      const val = o.value_numeric != null ? `${o.value_numeric} ${o.unit ?? ""}` : (o.value_text ?? "N/A");
       sections.push(
-        `[Formulation: ${o.formulation_name ?? "unknown"}] ${o.outcome_type ?? "outcome"}: ` +
-          `${o.metric_name ?? ""} = ${o.outcome_value ?? "N/A"} ${o.outcome_unit ?? ""} ` +
-          `(model: ${o.in_vivo_model ?? o.cell_line ?? o.tissue_type ?? "N/A"}) ` +
-          `${o.notes ? "Notes: " + o.notes : ""}`
+        `[${o.formulation_name ?? "unknown formulation"}] ${o.outcome_domain ?? ""} / ${o.metric_code ?? "outcome"}: ` +
+          `${val} | direction: ${o.direction ?? "N/A"} | ${o.interpretation ?? ""}`
       );
     }
   }
 
-  // Physicochemical measurements
   if (evidence.measurements.length > 0) {
     sections.push("\n=== PHYSICOCHEMICAL MEASUREMENTS ===");
-    for (const p of evidence.measurements.slice(0, 60)) {
+    for (const p of evidence.measurements) {
+      const val = p.value_numeric != null ? `${p.value_numeric} ${p.unit ?? ""}` : (p.value_text ?? "N/A");
       sections.push(
-        `[Formulation: ${p.formulation_name ?? "unknown"}] ${p.measurement_type ?? "measurement"}: ${p.value ?? "N/A"} ${p.unit ?? ""}`
+        `[${p.formulation_name ?? "unknown"}] ${p.metric_code ?? "measurement"}${p.condition_code ? " (" + p.condition_code + ")" : ""}: ${val}`
       );
     }
   }
 
-  // Mechanisms
   if (evidence.mechanisms.length > 0) {
     sections.push("\n=== DELIVERY MECHANISMS ===");
     for (const m of evidence.mechanisms) {
       sections.push(
-        `[Formulation: ${m.formulation_name ?? "unknown"}] ${m.mechanism_type ?? "mechanism"}: ${m.description ?? "N/A"}`
+        `[${m.formulation_name ?? "unknown"}] ${m.category ?? "mechanism"}: ${m.statement ?? "N/A"}`
       );
     }
   }
 
-  // Limitations
   if (evidence.limitations.length > 0) {
     sections.push("\n=== KNOWN LIMITATIONS ===");
     for (const l of evidence.limitations) {
       sections.push(
-        `[Formulation: ${l.formulation_name ?? "unknown"}] ${l.limitation_type ?? "limitation"}: ${l.description ?? "N/A"}`
+        `[${l.formulation_name ?? "unknown"}] ${l.category ?? "limitation"}: ${l.statement ?? "N/A"}`
       );
     }
   }
 
-  // Papers
   if (evidence.papers.length > 0) {
     sections.push("\n=== SUPPORTING PAPERS ===");
     for (const p of evidence.papers) {
       sections.push(
-        `[ID:${p.id}] "${p.title ?? "Untitled"}" — ${p.authors ?? "Authors unknown"}\n` +
-          `  Journal: ${p.journal ?? "N/A"}, Year: ${p.year ?? "N/A"}, DOI: ${p.doi ?? "N/A"}\n` +
-          `  Abstract: ${p.abstract ? p.abstract.substring(0, 300) + "..." : "N/A"}`
+        `"${p.title ?? "Untitled"}" — ${p.authors ?? "Authors unknown"}\n` +
+          `  Journal: ${p.journal ?? "N/A"}, Year: ${p.year ?? "N/A"}, DOI: ${p.doi ?? "N/A"}`
       );
     }
   }
 
-  return sections.join("\n");
+  return sections.length > 0
+    ? sections.join("\n")
+    : "No matching records found in the database for this query.";
 }
 
 export default router;

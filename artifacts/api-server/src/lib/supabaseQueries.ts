@@ -1,16 +1,21 @@
 /**
  * Supabase retrieval functions for the NANP Carrier Selection Platform.
- * These functions query the normalized database and return evidence records
- * that are passed to the LLM for reasoning. The LLM never touches the DB directly.
+ * Column names match the actual DB schema discovered via the REST API.
+ * The LLM never touches the DB — all evidence is retrieved here first.
  */
 
 import { supabase } from "./supabase.js";
 
+// ── Interfaces ────────────────────────────────────────────────────────────────
+
 export interface FormulationRecord {
-  id: number;
+  id: string;
   name: string | null;
   description: string | null;
-  formulation_type: string | null;
+  carrier_family: string | null;
+  carrier_subtype: string | null;
+  intended_route: string | null;
+  paper_id: string | null;
   cargo_types: string[];
   material_names: string[];
   targeting_strategies: string[];
@@ -18,235 +23,353 @@ export interface FormulationRecord {
 }
 
 export interface MaterialRecord {
-  id: number;
+  id: string;
   name: string | null;
-  material_type: string | null;
-  description: string | null;
+  material_class: string | null;
+  notes: string | null;
 }
 
 export interface OutcomeRecord {
-  id: number;
-  outcome_type: string | null;
-  cell_line: string | null;
-  tissue_type: string | null;
-  in_vivo_model: string | null;
-  outcome_value: number | null;
-  outcome_unit: string | null;
-  metric_name: string | null;
-  notes: string | null;
+  outcome_domain: string | null;
+  metric_code: string | null;
+  value_numeric: number | null;
+  value_text: string | null;
+  unit: string | null;
+  direction: string | null;
+  polarity: string | null;
+  interpretation: string | null;
   formulation_name: string | null;
 }
 
 export interface MechanismRecord {
-  id: number;
-  mechanism_type: string | null;
-  description: string | null;
+  category: string | null;
+  statement: string | null;
   formulation_name: string | null;
 }
 
 export interface LimitationRecord {
-  id: number;
-  limitation_type: string | null;
-  description: string | null;
+  category: string | null;
+  statement: string | null;
   formulation_name: string | null;
 }
 
 export interface PaperRecord {
-  id: number;
+  id: string;
   title: string | null;
   authors: string | null;
   journal: string | null;
   year: number | null;
   doi: string | null;
-  abstract: string | null;
 }
 
 export interface PhysicochemicalRecord {
-  id: number;
-  measurement_type: string | null;
-  value: number | null;
+  metric_code: string | null;
+  condition_code: string | null;
+  value_numeric: number | null;
+  value_text: string | null;
   unit: string | null;
   formulation_name: string | null;
 }
 
-/** Retrieve formulations with their materials, cargos, targeting strategies */
-export async function getFormulations(filters?: {
-  cargoType?: string;
-  disease?: string;
-}): Promise<FormulationRecord[]> {
-  // Start with base formulations
-  const { data: formulations, error: formError } = await supabase
-    .from("formulations")
-    .select("id, name, description, formulation_type")
-    .limit(100);
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-  if (formError || !formulations) {
-    return [];
-  }
+/** Find formulation IDs that carry the given nucleic acid cargo type */
+async function formulationIdsForCargo(cargoType: string): Promise<string[]> {
+  const { data: cargos } = await supabase
+    .from("cargos")
+    .select("cargo_id")
+    .eq("cargo_type", cargoType);
 
-  const formIds = formulations.map((f) => f.id);
+  if (!cargos?.length) return [];
 
-  // Get materials for these formulations
-  const { data: fmData } = await supabase
-    .from("formulation_materials")
-    .select("formulation_id, materials(name)")
-    .in("formulation_id", formIds);
-
-  // Get cargos
-  const { data: fcData } = await supabase
+  const { data: links } = await supabase
     .from("formulation_cargos")
-    .select("formulation_id, cargos(cargo_type)")
-    .in("formulation_id", formIds);
+    .select("formulation_id")
+    .in("cargo_id", cargos.map((c) => c.cargo_id));
 
-  // Get targeting strategies
-  const { data: ftData } = await supabase
-    .from("formulation_targeting")
-    .select("formulation_id, targeting_strategy")
-    .in("formulation_id", formIds);
+  return [...new Set((links ?? []).map((l) => l.formulation_id))];
+}
 
-  // Get processes
-  const { data: fpData } = await supabase
-    .from("formulation_processes")
-    .select("formulation_id, process_name")
-    .in("formulation_id", formIds);
+// ── Evidence retrieval ────────────────────────────────────────────────────────
 
-  // Assemble
+/**
+ * Retrieve formulations associated with the given nucleic acid cargo type.
+ * Returns all matching formulations with their materials, cargos, targeting,
+ * and process details assembled from the junction tables.
+ */
+export async function getFormulations(nucleicAcid: string): Promise<FormulationRecord[]> {
+  const formulationIds = await formulationIdsForCargo(nucleicAcid);
+  if (!formulationIds.length) return [];
+
+  const { data: formulations, error } = await supabase
+    .from("formulations")
+    .select(
+      "formulation_id, formulation_name, formulation_description_raw, carrier_family, carrier_subtype, intended_route, paper_id"
+    )
+    .in("formulation_id", formulationIds);
+
+  if (error || !formulations?.length) return [];
+
+  // Enrich with junction table data in parallel
+  const ids = formulations.map((f) => f.formulation_id);
+
+  const [fmData, fcData, ftData, fpData] = await Promise.all([
+    supabase
+      .from("formulation_materials")
+      .select("formulation_id, materials(canonical_name)")
+      .in("formulation_id", ids),
+    supabase
+      .from("formulation_cargos")
+      .select("formulation_id, cargos(cargo_type)")
+      .in("formulation_id", ids),
+    supabase
+      .from("formulation_targeting")
+      .select("formulation_id, targeting_strategy, target_name")
+      .in("formulation_id", ids),
+    supabase
+      .from("formulation_processes")
+      .select("formulation_id, process_stage, method")
+      .in("formulation_id", ids),
+  ]);
+
   return formulations.map((f) => ({
-    id: f.id,
-    name: f.name,
-    description: f.description,
-    formulation_type: f.formulation_type,
-    cargo_types: (fcData || [])
-      .filter((fc) => fc.formulation_id === f.id)
+    id: f.formulation_id,
+    name: f.formulation_name,
+    description: f.formulation_description_raw,
+    carrier_family: f.carrier_family,
+    carrier_subtype: f.carrier_subtype,
+    intended_route: f.intended_route,
+    paper_id: f.paper_id,
+    cargo_types: (fcData.data ?? [])
+      .filter((fc) => fc.formulation_id === f.formulation_id)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((fc) => (fc.cargos as any)?.cargo_type)
       .filter(Boolean),
-    material_names: (fmData || [])
-      .filter((fm) => fm.formulation_id === f.id)
+    material_names: (fmData.data ?? [])
+      .filter((fm) => fm.formulation_id === f.formulation_id)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((fm) => (fm.materials as any)?.name)
+      .map((fm) => (fm.materials as any)?.canonical_name)
       .filter(Boolean),
-    targeting_strategies: (ftData || [])
-      .filter((ft) => ft.formulation_id === f.id)
-      .map((ft) => ft.targeting_strategy)
+    targeting_strategies: (ftData.data ?? [])
+      .filter((ft) => ft.formulation_id === f.formulation_id)
+      .map((ft) => [ft.targeting_strategy, ft.target_name].filter(Boolean).join(" → "))
       .filter(Boolean) as string[],
-    processes: (fpData || [])
-      .filter((fp) => fp.formulation_id === f.id)
-      .map((fp) => fp.process_name)
+    processes: (fpData.data ?? [])
+      .filter((fp) => fp.formulation_id === f.formulation_id)
+      .map((fp) => [fp.process_stage, fp.method].filter(Boolean).join(": "))
       .filter(Boolean) as string[],
   }));
 }
 
-/** Retrieve materials from the database */
-export async function getMaterials(): Promise<MaterialRecord[]> {
+/** Retrieve materials referenced across all formulations */
+export async function getMaterials(formulationIds: string[]): Promise<MaterialRecord[]> {
+  if (!formulationIds.length) return [];
+
+  const { data: links } = await supabase
+    .from("formulation_materials")
+    .select("material_id")
+    .in("formulation_id", formulationIds);
+
+  if (!links?.length) return [];
+
+  const matIds = [...new Set(links.map((l) => l.material_id))];
+
   const { data, error } = await supabase
     .from("materials")
-    .select("id, name, material_type, description")
-    .limit(200);
-
-  if (error || !data) return [];
-  return data;
-}
-
-/** Retrieve biological outcomes linked to formulations */
-export async function getOutcomes(): Promise<OutcomeRecord[]> {
-  const { data, error } = await supabase
-    .from("biological_outcomes")
-    .select(
-      `id, outcome_type, cell_line, tissue_type, in_vivo_model, outcome_value, outcome_unit, metric_name, notes,
-       experimental_arms(experiments(formulations(name)))`
-    )
-    .limit(300);
-
-  if (error || !data) return [];
-
-  return data.map((o) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const arm = (o as any).experimental_arms;
-    const exp = arm?.experiments;
-    const form = exp?.formulations;
-    return {
-      id: o.id,
-      outcome_type: o.outcome_type,
-      cell_line: o.cell_line,
-      tissue_type: o.tissue_type,
-      in_vivo_model: o.in_vivo_model,
-      outcome_value: o.outcome_value,
-      outcome_unit: o.outcome_unit,
-      metric_name: o.metric_name,
-      notes: o.notes,
-      formulation_name: form?.name ?? null,
-    };
-  });
-}
-
-/** Retrieve delivery mechanisms */
-export async function getMechanisms(): Promise<MechanismRecord[]> {
-  const { data, error } = await supabase
-    .from("mechanisms")
-    .select("id, mechanism_type, description, formulations(name)")
-    .limit(200);
+    .select("material_id, canonical_name, material_class, material_notes")
+    .in("material_id", matIds);
 
   if (error || !data) return [];
 
   return data.map((m) => ({
-    id: m.id,
-    mechanism_type: m.mechanism_type,
-    description: m.description,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    formulation_name: (m.formulations as any)?.name ?? null,
+    id: m.material_id,
+    name: m.canonical_name,
+    material_class: m.material_class,
+    notes: m.material_notes,
   }));
 }
 
-/** Retrieve known limitations of formulations */
-export async function getLimitations(): Promise<LimitationRecord[]> {
+/** Retrieve biological outcomes for specific formulations */
+export async function getOutcomes(formulationIds: string[]): Promise<OutcomeRecord[]> {
+  if (!formulationIds.length) return [];
+
+  // arm_id → experimental_arms.formulation_cargo_id → formulation_cargos.formulation_id
+  const { data: fcLinks } = await supabase
+    .from("formulation_cargos")
+    .select("formulation_cargo_id, formulation_id")
+    .in("formulation_id", formulationIds);
+
+  if (!fcLinks?.length) return [];
+
+  const fcIds = fcLinks.map((fc) => fc.formulation_cargo_id);
+
+  const { data: arms } = await supabase
+    .from("experimental_arms")
+    .select("arm_id, formulation_cargo_id")
+    .in("formulation_cargo_id", fcIds);
+
+  if (!arms?.length) return [];
+
+  const armIds = arms.map((a) => a.arm_id);
+
+  // Build a map from arm_id → formulation_name
+  const fcToFormulationId = Object.fromEntries(
+    fcLinks.map((fc) => [fc.formulation_cargo_id, fc.formulation_id])
+  );
+  const armToFcId = Object.fromEntries(
+    arms.map((a) => [a.arm_id, a.formulation_cargo_id])
+  );
+
+  // Get formulation names
+  const { data: formulations } = await supabase
+    .from("formulations")
+    .select("formulation_id, formulation_name")
+    .in("formulation_id", formulationIds);
+
+  const formulationNameById = Object.fromEntries(
+    (formulations ?? []).map((f) => [f.formulation_id, f.formulation_name])
+  );
+
+  const { data: outcomes, error } = await supabase
+    .from("biological_outcomes")
+    .select(
+      "arm_id, outcome_domain, metric_code, value_numeric, value_text, unit, direction_vs_comparator, result_polarity, result_interpretation"
+    )
+    .in("arm_id", armIds)
+    .limit(300);
+
+  if (error || !outcomes) return [];
+
+  return outcomes.map((o) => {
+    const fcId = armToFcId[o.arm_id];
+    const formulationId = fcToFormulationId[fcId];
+    return {
+      outcome_domain: o.outcome_domain,
+      metric_code: o.metric_code,
+      value_numeric: o.value_numeric,
+      value_text: o.value_text,
+      unit: o.unit,
+      direction: o.direction_vs_comparator,
+      polarity: o.result_polarity,
+      interpretation: o.result_interpretation,
+      formulation_name: formulationNameById[formulationId] ?? null,
+    };
+  });
+}
+
+/** Retrieve delivery mechanisms for specific formulations */
+export async function getMechanisms(formulationIds: string[]): Promise<MechanismRecord[]> {
+  if (!formulationIds.length) return [];
+
   const { data, error } = await supabase
-    .from("limitations")
-    .select("id, limitation_type, description, formulations(name)")
+    .from("mechanisms")
+    .select("mechanism_category, mechanism_statement, formulation_id")
+    .in("formulation_id", formulationIds)
     .limit(200);
 
   if (error || !data) return [];
 
-  return data.map((l) => ({
-    id: l.id,
-    limitation_type: l.limitation_type,
-    description: l.description,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    formulation_name: (l.formulations as any)?.name ?? null,
+  const { data: formulations } = await supabase
+    .from("formulations")
+    .select("formulation_id, formulation_name")
+    .in("formulation_id", formulationIds);
+
+  const nameById = Object.fromEntries(
+    (formulations ?? []).map((f) => [f.formulation_id, f.formulation_name])
+  );
+
+  return data.map((m) => ({
+    category: m.mechanism_category,
+    statement: m.mechanism_statement,
+    formulation_name: nameById[m.formulation_id] ?? null,
   }));
 }
 
-/** Retrieve supporting papers */
-export async function getSupportingPapers(): Promise<PaperRecord[]> {
+/** Retrieve known limitations for specific formulations */
+export async function getLimitations(formulationIds: string[]): Promise<LimitationRecord[]> {
+  if (!formulationIds.length) return [];
+
   const { data, error } = await supabase
-    .from("papers")
-    .select("id, title, authors, journal, year, doi, abstract")
-    .limit(100);
+    .from("limitations")
+    .select("limitation_category, limitation_statement, formulation_id")
+    .in("formulation_id", formulationIds)
+    .limit(200);
 
   if (error || !data) return [];
-  return data;
+
+  const { data: formulations } = await supabase
+    .from("formulations")
+    .select("formulation_id, formulation_name")
+    .in("formulation_id", formulationIds);
+
+  const nameById = Object.fromEntries(
+    (formulations ?? []).map((f) => [f.formulation_id, f.formulation_name])
+  );
+
+  return data.map((l) => ({
+    category: l.limitation_category,
+    statement: l.limitation_statement,
+    formulation_name: nameById[l.formulation_id] ?? null,
+  }));
 }
 
-/** Retrieve physicochemical measurements */
-export async function getPhysicochemicalMeasurements(): Promise<
-  PhysicochemicalRecord[]
-> {
+/** Retrieve supporting papers by paper IDs */
+export async function getSupportingPapers(paperIds: string[]): Promise<PaperRecord[]> {
+  if (!paperIds.length) return [];
+
   const { data, error } = await supabase
-    .from("physicochemical_measurements")
-    .select("id, measurement_type, value, unit, experiments(formulations(name))")
-    .limit(300);
+    .from("papers")
+    .select("paper_id, title, authors_text, journal, publication_year, doi")
+    .in("paper_id", paperIds);
 
   if (error || !data) return [];
 
   return data.map((p) => ({
-    id: p.id,
-    measurement_type: p.measurement_type,
-    value: p.value,
-    unit: p.unit,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    formulation_name: (p.experiments as any)?.formulations?.name ?? null,
+    id: p.paper_id,
+    title: p.title,
+    authors: p.authors_text,
+    journal: p.journal,
+    year: p.publication_year,
+    doi: p.doi,
   }));
 }
+
+/** Retrieve physicochemical measurements for specific formulations */
+export async function getPhysicochemicalMeasurements(
+  formulationIds: string[]
+): Promise<PhysicochemicalRecord[]> {
+  if (!formulationIds.length) return [];
+
+  const { data, error } = await supabase
+    .from("physicochemical_measurements")
+    .select(
+      "formulation_id, metric_code, condition_code, value_numeric, value_text, unit"
+    )
+    .in("formulation_id", formulationIds)
+    .limit(300);
+
+  if (error || !data) return [];
+
+  const { data: formulations } = await supabase
+    .from("formulations")
+    .select("formulation_id, formulation_name")
+    .in("formulation_id", formulationIds);
+
+  const nameById = Object.fromEntries(
+    (formulations ?? []).map((f) => [f.formulation_id, f.formulation_name])
+  );
+
+  return data.map((p) => ({
+    metric_code: p.metric_code,
+    condition_code: p.condition_code,
+    value_numeric: p.value_numeric,
+    value_text: p.value_text,
+    unit: p.unit,
+    formulation_name: nameById[p.formulation_id] ?? null,
+  }));
+}
+
+// ── Dropdown options ──────────────────────────────────────────────────────────
 
 /** Distinct cargo / nucleic acid types from the cargos table */
 export async function getCargos(): Promise<string[]> {
@@ -286,6 +409,8 @@ export async function getRoutes(): Promise<string[]> {
   ];
   return Array.from(new Set(routes.filter(Boolean))).sort();
 }
+
+// ── Database statistics ───────────────────────────────────────────────────────
 
 /** Get database statistics */
 export async function getDatabaseStatistics(): Promise<{

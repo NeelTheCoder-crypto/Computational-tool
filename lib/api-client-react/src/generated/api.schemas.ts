@@ -13,31 +13,27 @@ export interface ApiError {
   error: string;
 }
 
-export interface RecommendationInput {
-  /** The therapeutic nucleic acid type (e.g. mRNA, siRNA, pDNA) */
-  nucleic_acid: string;
-  /** The target disease or condition */
-  disease: string;
-  /** The intended delivery route (e.g. intravenous, intramuscular) */
-  route_of_administration: string;
+export interface OptionList {
+  /** Distinct values from the database, alphabetically sorted */
+  values: string[];
 }
 
-/**
- * Confidence level of the recommendation
- */
-export type RecommendationResultConfidence = typeof RecommendationResultConfidence[keyof typeof RecommendationResultConfidence];
-
-
-export const RecommendationResultConfidence = {
-  high: 'high',
-  moderate: 'moderate',
-  low: 'low',
-} as const;
-
-export interface SupportingPublication {
+export interface FormulationSummary {
+  id: string;
+  name: string;
   /** @nullable */
-  paper_id?: number | null;
-  title: string;
+  carrier_family?: string | null;
+  /** @nullable */
+  carrier_subtype?: string | null;
+}
+
+export interface FormulationList {
+  formulations: FormulationSummary[];
+}
+
+export interface FormulationPaper {
+  /** @nullable */
+  title: string | null;
   /** @nullable */
   authors?: string | null;
   /** @nullable */
@@ -46,41 +42,25 @@ export interface SupportingPublication {
   year?: number | null;
   /** @nullable */
   doi?: string | null;
-  /** How this paper supports the recommendation */
-  relevance: string;
 }
 
-export interface AlternativeFormulation {
+export interface FormulationDetail {
+  id: string;
   name: string;
-  materials?: string[];
-  /** Why this is a viable alternative */
-  rationale: string;
-}
-
-export interface RecommendationResult {
-  /** Name of the top recommended carrier formulation */
-  recommended_carrier: string;
-  /** Confidence level of the recommendation */
-  confidence: RecommendationResultConfidence;
-  /** Detailed scientific explanation of why this carrier was selected */
-  scientific_rationale: string;
-  /** Key material components of the recommended carrier */
-  key_components: string[];
-  /** Advantages of the recommended carrier for this use case */
+  /** @nullable */
+  carrier_family?: string | null;
+  /** @nullable */
+  carrier_subtype?: string | null;
+  /** @nullable */
+  description?: string | null;
+  materials: string[];
+  /** Beneficial outcomes and supporting mechanisms from the database */
   advantages: string[];
-  /** Known limitations and challenges */
+  /** Known limitations directly from the database records */
   limitations: string[];
-  /** Biological and physicochemical mechanisms supporting the recommendation */
-  supporting_mechanisms: string[];
-  /** Database records supporting the recommendation */
-  supporting_publications: SupportingPublication[];
-  /** Other viable carrier formulations considered */
-  alternative_formulations: AlternativeFormulation[];
-}
-
-export interface OptionList {
-  /** Distinct values from the database, alphabetically sorted */
-  values: string[];
+  /** Delivery mechanism statements from the database */
+  mechanisms: string[];
+  papers: FormulationPaper[];
 }
 
 export interface DatabaseStats {
@@ -90,4 +70,16 @@ export interface DatabaseStats {
   total_experiments: number;
   total_biological_outcomes: number;
 }
+
+export type GetRouteOptionsParams = {
+/**
+ * When provided, returns only routes that have evidence for this disease model
+ */
+disease?: string;
+};
+
+export type GetFormulationOptionsParams = {
+disease: string;
+route: string;
+};
 

@@ -5,10 +5,8 @@
  * NANP Carrier Selection Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { FormulationSummary } from './formulationSummary';
 
-export interface AlternativeFormulation {
-  name: string;
-  materials?: string[];
-  /** Why this is a viable alternative */
-  rationale: string;
+export interface FormulationList {
+  formulations: FormulationSummary[];
 }

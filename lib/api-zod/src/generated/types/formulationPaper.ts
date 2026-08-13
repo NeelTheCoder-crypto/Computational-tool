@@ -6,10 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SupportingPublication {
+export interface FormulationPaper {
   /** @nullable */
-  paper_id?: number | null;
-  title: string;
+  title: string | null;
   /** @nullable */
   authors?: string | null;
   /** @nullable */
@@ -18,6 +17,4 @@ export interface SupportingPublication {
   year?: number | null;
   /** @nullable */
   doi?: string | null;
-  /** How this paper supports the recommendation */
-  relevance: string;
 }

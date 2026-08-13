@@ -369,6 +369,226 @@ export async function getPhysicochemicalMeasurements(
   }));
 }
 
+// ── Cascading explorer queries ────────────────────────────────────────────────
+
+export interface FormulationSummaryRecord {
+  id: string;
+  name: string;
+  carrier_family: string | null;
+  carrier_subtype: string | null;
+}
+
+export interface FormulationDetailRecord {
+  id: string;
+  name: string;
+  carrier_family: string | null;
+  carrier_subtype: string | null;
+  description: string | null;
+  materials: string[];
+  advantages: string[];
+  limitations: string[];
+  mechanisms: string[];
+  papers: Array<{
+    title: string | null;
+    authors: string | null;
+    journal: string | null;
+    year: number | null;
+    doi: string | null;
+  }>;
+}
+
+/** Routes that have experimental evidence for the given disease model */
+export async function getRoutesForDisease(disease: string): Promise<string[]> {
+  const { data: models } = await supabase
+    .from("models")
+    .select("model_id")
+    .eq("disease_model", disease);
+
+  if (!models?.length) return [];
+
+  const { data: experiments } = await supabase
+    .from("experiments")
+    .select("experiment_id")
+    .in("model_id", models.map((m) => m.model_id));
+
+  if (!experiments?.length) return [];
+
+  const { data: arms } = await supabase
+    .from("experimental_arms")
+    .select("administration_route")
+    .in("experiment_id", experiments.map((e) => e.experiment_id))
+    .not("administration_route", "is", null);
+
+  return Array.from(
+    new Set((arms ?? []).map((a) => a.administration_route as string).filter(Boolean))
+  ).sort();
+}
+
+/** Formulations studied for a specific disease model and route of administration */
+export async function getFormulationsForDiseaseRoute(
+  disease: string,
+  route: string
+): Promise<FormulationSummaryRecord[]> {
+  const { data: models } = await supabase
+    .from("models")
+    .select("model_id")
+    .eq("disease_model", disease);
+
+  if (!models?.length) return [];
+
+  const { data: experiments } = await supabase
+    .from("experiments")
+    .select("experiment_id")
+    .in("model_id", models.map((m) => m.model_id));
+
+  if (!experiments?.length) return [];
+
+  const { data: arms } = await supabase
+    .from("experimental_arms")
+    .select("formulation_cargo_id")
+    .in("experiment_id", experiments.map((e) => e.experiment_id))
+    .eq("administration_route", route)
+    .not("formulation_cargo_id", "is", null);
+
+  if (!arms?.length) return [];
+
+  const fcIds = [...new Set(arms.map((a) => a.formulation_cargo_id))];
+
+  const { data: fcs } = await supabase
+    .from("formulation_cargos")
+    .select("formulation_id")
+    .in("formulation_cargo_id", fcIds);
+
+  if (!fcs?.length) return [];
+
+  const formulationIds = [...new Set(fcs.map((fc) => fc.formulation_id))];
+
+  const { data: formulations } = await supabase
+    .from("formulations")
+    .select("formulation_id, formulation_name, carrier_family, carrier_subtype")
+    .in("formulation_id", formulationIds)
+    .order("formulation_name");
+
+  return (formulations ?? []).map((f) => ({
+    id: f.formulation_id,
+    name: f.formulation_name ?? "Unnamed",
+    carrier_family: f.carrier_family,
+    carrier_subtype: f.carrier_subtype,
+  }));
+}
+
+/** Full detail for one formulation: advantages, limitations, mechanisms, materials, papers */
+export async function getFormulationById(
+  id: string
+): Promise<FormulationDetailRecord | null> {
+  const { data: f } = await supabase
+    .from("formulations")
+    .select(
+      "formulation_id, formulation_name, carrier_family, carrier_subtype, formulation_description_raw, paper_id"
+    )
+    .eq("formulation_id", id)
+    .single();
+
+  if (!f) return null;
+
+  // Find arm_ids via formulation_cargos
+  const { data: fcLinks } = await supabase
+    .from("formulation_cargos")
+    .select("formulation_cargo_id")
+    .eq("formulation_id", id);
+
+  const fcIds = (fcLinks ?? []).map((fc) => fc.formulation_cargo_id);
+
+  const [materialsData, mechanismsData, limitationsData, armsData, paperData] =
+    await Promise.all([
+      supabase
+        .from("formulation_materials")
+        .select("materials(canonical_name)")
+        .eq("formulation_id", id),
+      supabase
+        .from("mechanisms")
+        .select("mechanism_statement")
+        .eq("formulation_id", id),
+      supabase
+        .from("limitations")
+        .select("limitation_statement")
+        .eq("formulation_id", id),
+      fcIds.length > 0
+        ? supabase
+            .from("experimental_arms")
+            .select("arm_id")
+            .in("formulation_cargo_id", fcIds)
+        : Promise.resolve({ data: [] as { arm_id: string }[] }),
+      f.paper_id
+        ? supabase
+            .from("papers")
+            .select("title, authors_text, journal, publication_year, doi")
+            .eq("paper_id", f.paper_id)
+            .single()
+        : Promise.resolve({ data: null }),
+    ]);
+
+  const armIds = (armsData.data ?? []).map((a) => a.arm_id);
+
+  const outcomesData =
+    armIds.length > 0
+      ? await supabase
+          .from("biological_outcomes")
+          .select(
+            "result_interpretation, value_text, result_polarity, direction_vs_comparator"
+          )
+          .in("arm_id", armIds)
+      : { data: [] as Array<{
+          result_interpretation: string | null;
+          value_text: string | null;
+          result_polarity: string | null;
+          direction_vs_comparator: string | null;
+        }> };
+
+  const mechanismStatements = (mechanismsData.data ?? [])
+    .map((m) => m.mechanism_statement)
+    .filter(Boolean) as string[];
+
+  const advantageOutcomes = (outcomesData.data ?? [])
+    .filter(
+      (o) =>
+        o.result_polarity === "beneficial" ||
+        o.direction_vs_comparator === "improved"
+    )
+    .map((o) => o.result_interpretation ?? o.value_text)
+    .filter(Boolean) as string[];
+
+  const paper = paperData.data;
+
+  return {
+    id: f.formulation_id,
+    name: f.formulation_name ?? "Unnamed",
+    carrier_family: f.carrier_family,
+    carrier_subtype: f.carrier_subtype,
+    description: f.formulation_description_raw,
+    materials: (materialsData.data ?? [])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((m) => (m.materials as any)?.canonical_name)
+      .filter(Boolean) as string[],
+    advantages: [...new Set([...advantageOutcomes, ...mechanismStatements])],
+    limitations: (limitationsData.data ?? [])
+      .map((l) => l.limitation_statement)
+      .filter(Boolean) as string[],
+    mechanisms: mechanismStatements,
+    papers: paper
+      ? [
+          {
+            title: paper.title,
+            authors: paper.authors_text,
+            journal: paper.journal,
+            year: paper.publication_year,
+            doi: paper.doi,
+          },
+        ]
+      : [],
+  };
+}
+
 // ── Dropdown options ──────────────────────────────────────────────────────────
 
 /** Distinct cargo / nucleic acid types from the cargos table */

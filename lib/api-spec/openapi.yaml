@@ -10,10 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
-  - name: recommend
-    description: Carrier recommendation operations
   - name: options
-    description: Dropdown options
+    description: Cascading dropdown options
+  - name: formulations
+    description: Formulation explorer
   - name: stats
     description: Database statistics
 paths:
@@ -22,7 +22,6 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -31,61 +30,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
-  /recommend:
-    post:
-      operationId: getRecommendation
-      tags: [recommend]
-      summary: Get carrier recommendation
-      description: >
-        Accepts therapeutic nucleic acid, disease, and route of administration.
-        Queries the Supabase database for matching formulations and evidence,
-        then uses OpenAI to synthesize a recommendation grounded in retrieved records.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RecommendationInput"
-      responses:
-        "200":
-          description: Structured carrier recommendation
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RecommendationResult"
-        "400":
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiError"
-        "500":
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiError"
-
-  /options/cargos:
-    get:
-      operationId: getCargoOptions
-      tags: [options]
-      summary: Get nucleic acid / cargo types
-      description: Returns distinct cargo types from the database, deduplicated and alphabetized
-      responses:
-        "200":
-          description: List of cargo types
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OptionList"
-
   /options/diseases:
     get:
       operationId: getDiseaseOptions
       tags: [options]
-      summary: Get disease / disease model values
-      description: Returns distinct disease models from the database, deduplicated and alphabetized
+      summary: All disease models in the database
       responses:
         "200":
           description: List of disease values
@@ -98,8 +47,14 @@ paths:
     get:
       operationId: getRouteOptions
       tags: [options]
-      summary: Get routes of administration
-      description: Returns distinct routes of administration from the database, deduplicated and alphabetized
+      summary: Routes of administration, optionally filtered by disease
+      parameters:
+        - name: disease
+          in: query
+          required: false
+          description: When provided, returns only routes that have evidence for this disease model
+          schema:
+            type: string
       responses:
         "200":
           description: List of route values
@@ -108,12 +63,60 @@ paths:
               schema:
                 $ref: "#/components/schemas/OptionList"
 
+  /options/formulations:
+    get:
+      operationId: getFormulationOptions
+      tags: [options]
+      summary: Formulations studied for a specific disease and route
+      parameters:
+        - name: disease
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: route
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of matching formulations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormulationList"
+
+  /formulation/{id}:
+    get:
+      operationId: getFormulationDetail
+      tags: [formulations]
+      summary: Full detail for one formulation — advantages, limitations, materials, papers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Formulation detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormulationDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   /stats:
     get:
       operationId: getDatabaseStats
       tags: [stats]
       summary: Get database statistics
-      description: Returns summary statistics about the scientific literature database
       responses:
         "200":
           description: Database statistics
@@ -126,101 +129,56 @@ components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
     ApiError:
       type: object
+      required: [error]
       properties:
         error:
           type: string
-      required:
-        - error
 
-    RecommendationInput:
+    OptionList:
       type: object
-      required:
-        - nucleic_acid
-        - disease
-        - route_of_administration
+      required: [values]
       properties:
-        nucleic_acid:
-          type: string
-          description: The therapeutic nucleic acid type (e.g. mRNA, siRNA, pDNA)
-        disease:
-          type: string
-          description: The target disease or condition
-        route_of_administration:
-          type: string
-          description: The intended delivery route (e.g. intravenous, intramuscular)
+        values:
+          type: array
+          items:
+            type: string
+          description: Distinct values from the database, alphabetically sorted
 
-    RecommendationResult:
+    FormulationSummary:
       type: object
-      required:
-        - recommended_carrier
-        - confidence
-        - scientific_rationale
-        - key_components
-        - advantages
-        - limitations
-        - supporting_mechanisms
-        - supporting_publications
-        - alternative_formulations
+      required: [id, name]
       properties:
-        recommended_carrier:
+        id:
           type: string
-          description: Name of the top recommended carrier formulation
-        confidence:
+        name:
           type: string
-          enum: [high, moderate, low]
-          description: Confidence level of the recommendation
-        scientific_rationale:
-          type: string
-          description: Detailed scientific explanation of why this carrier was selected
-        key_components:
-          type: array
-          items:
-            type: string
-          description: Key material components of the recommended carrier
-        advantages:
-          type: array
-          items:
-            type: string
-          description: Advantages of the recommended carrier for this use case
-        limitations:
-          type: array
-          items:
-            type: string
-          description: Known limitations and challenges
-        supporting_mechanisms:
-          type: array
-          items:
-            type: string
-          description: Biological and physicochemical mechanisms supporting the recommendation
-        supporting_publications:
-          type: array
-          items:
-            $ref: "#/components/schemas/SupportingPublication"
-          description: Database records supporting the recommendation
-        alternative_formulations:
-          type: array
-          items:
-            $ref: "#/components/schemas/AlternativeFormulation"
-          description: Other viable carrier formulations considered
+        carrier_family:
+          type: ["string", "null"]
+        carrier_subtype:
+          type: ["string", "null"]
 
-    SupportingPublication:
+    FormulationList:
       type: object
-      required:
-        - title
-        - relevance
+      required: [formulations]
       properties:
-        paper_id:
-          type: ["integer", "null"]
+        formulations:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormulationSummary"
+
+    FormulationPaper:
+      type: object
+      required: [title]
+      properties:
         title:
-          type: string
+          type: ["string", "null"]
         authors:
           type: ["string", "null"]
         journal:
@@ -229,36 +187,44 @@ components:
           type: ["integer", "null"]
         doi:
           type: ["string", "null"]
-        relevance:
-          type: string
-          description: How this paper supports the recommendation
 
-    AlternativeFormulation:
+    FormulationDetail:
       type: object
-      required:
-        - name
-        - rationale
+      required: [id, name, advantages, limitations, mechanisms, materials, papers]
       properties:
+        id:
+          type: string
         name:
           type: string
+        carrier_family:
+          type: ["string", "null"]
+        carrier_subtype:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
         materials:
           type: array
           items:
             type: string
-        rationale:
-          type: string
-          description: Why this is a viable alternative
-
-    OptionList:
-      type: object
-      required:
-        - values
-      properties:
-        values:
+        advantages:
           type: array
           items:
             type: string
-          description: Distinct values from the database, alphabetically sorted
+          description: Beneficial outcomes and supporting mechanisms from the database
+        limitations:
+          type: array
+          items:
+            type: string
+          description: Known limitations directly from the database records
+        mechanisms:
+          type: array
+          items:
+            type: string
+          description: Delivery mechanism statements from the database
+        papers:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormulationPaper"
 
     DatabaseStats:
       type: object

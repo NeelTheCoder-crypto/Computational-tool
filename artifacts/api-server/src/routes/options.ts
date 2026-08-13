@@ -1,24 +1,37 @@
 import { Router, type IRouter } from "express";
-import { getCargos, getDiseases, getRoutes } from "../lib/supabaseQueries.js";
+import {
+  getDiseases,
+  getRoutes,
+  getRoutesForDisease,
+  getFormulationsForDiseaseRoute,
+} from "../lib/supabaseQueries.js";
 
 const router: IRouter = Router();
 
-router.get("/options/cargos", async (req, res): Promise<void> => {
-  const values = await getCargos();
-  req.log.info({ count: values.length }, "Cargo options retrieved");
-  res.json({ values });
-});
-
 router.get("/options/diseases", async (req, res): Promise<void> => {
   const values = await getDiseases();
-  req.log.info({ count: values.length }, "Disease options retrieved");
   res.json({ values });
 });
 
 router.get("/options/routes", async (req, res): Promise<void> => {
-  const values = await getRoutes();
-  req.log.info({ count: values.length }, "Route options retrieved");
+  const disease = req.query["disease"] as string | undefined;
+  const values = disease
+    ? await getRoutesForDisease(disease)
+    : await getRoutes();
   res.json({ values });
+});
+
+router.get("/options/formulations", async (req, res): Promise<void> => {
+  const disease = req.query["disease"] as string | undefined;
+  const route = req.query["route"] as string | undefined;
+
+  if (!disease || !route) {
+    res.status(400).json({ error: "disease and route query params are required" });
+    return;
+  }
+
+  const formulations = await getFormulationsForDiseaseRoute(disease, route);
+  res.json({ formulations });
 });
 
 export default router;

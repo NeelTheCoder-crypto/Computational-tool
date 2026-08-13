@@ -9,7 +9,6 @@ import * as zod from 'zod';
 
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -18,52 +17,7 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * Accepts therapeutic nucleic acid, disease, and route of administration. Queries the Supabase database for matching formulations and evidence, then uses OpenAI to synthesize a recommendation grounded in retrieved records.
- * @summary Get carrier recommendation
- */
-export const GetRecommendationBody = zod.object({
-  "nucleic_acid": zod.string().describe('The therapeutic nucleic acid type (e.g. mRNA, siRNA, pDNA)'),
-  "disease": zod.string().describe('The target disease or condition'),
-  "route_of_administration": zod.string().describe('The intended delivery route (e.g. intravenous, intramuscular)')
-})
-
-export const GetRecommendationResponse = zod.object({
-  "recommended_carrier": zod.string().describe('Name of the top recommended carrier formulation'),
-  "confidence": zod.enum(['high', 'moderate', 'low']).describe('Confidence level of the recommendation'),
-  "scientific_rationale": zod.string().describe('Detailed scientific explanation of why this carrier was selected'),
-  "key_components": zod.array(zod.string()).describe('Key material components of the recommended carrier'),
-  "advantages": zod.array(zod.string()).describe('Advantages of the recommended carrier for this use case'),
-  "limitations": zod.array(zod.string()).describe('Known limitations and challenges'),
-  "supporting_mechanisms": zod.array(zod.string()).describe('Biological and physicochemical mechanisms supporting the recommendation'),
-  "supporting_publications": zod.array(zod.object({
-  "paper_id": zod.number().nullish(),
-  "title": zod.string(),
-  "authors": zod.string().nullish(),
-  "journal": zod.string().nullish(),
-  "year": zod.number().nullish(),
-  "doi": zod.string().nullish(),
-  "relevance": zod.string().describe('How this paper supports the recommendation')
-})).describe('Database records supporting the recommendation'),
-  "alternative_formulations": zod.array(zod.object({
-  "name": zod.string(),
-  "materials": zod.array(zod.string()).optional(),
-  "rationale": zod.string().describe('Why this is a viable alternative')
-})).describe('Other viable carrier formulations considered')
-})
-
-
-/**
- * Returns distinct cargo types from the database, deduplicated and alphabetized
- * @summary Get nucleic acid / cargo types
- */
-export const GetCargoOptionsResponse = zod.object({
-  "values": zod.array(zod.string()).describe('Distinct values from the database, alphabetically sorted')
-})
-
-
-/**
- * Returns distinct disease models from the database, deduplicated and alphabetized
- * @summary Get disease / disease model values
+ * @summary All disease models in the database
  */
 export const GetDiseaseOptionsResponse = zod.object({
   "values": zod.array(zod.string()).describe('Distinct values from the database, alphabetically sorted')
@@ -71,16 +25,63 @@ export const GetDiseaseOptionsResponse = zod.object({
 
 
 /**
- * Returns distinct routes of administration from the database, deduplicated and alphabetized
- * @summary Get routes of administration
+ * @summary Routes of administration, optionally filtered by disease
  */
+export const GetRouteOptionsQueryParams = zod.object({
+  "disease": zod.coerce.string().optional().describe('When provided, returns only routes that have evidence for this disease model')
+})
+
 export const GetRouteOptionsResponse = zod.object({
   "values": zod.array(zod.string()).describe('Distinct values from the database, alphabetically sorted')
 })
 
 
 /**
- * Returns summary statistics about the scientific literature database
+ * @summary Formulations studied for a specific disease and route
+ */
+export const GetFormulationOptionsQueryParams = zod.object({
+  "disease": zod.coerce.string(),
+  "route": zod.coerce.string()
+})
+
+export const GetFormulationOptionsResponse = zod.object({
+  "formulations": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "carrier_family": zod.string().nullish(),
+  "carrier_subtype": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Full detail for one formulation — advantages, limitations, materials, papers
+ */
+export const GetFormulationDetailParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetFormulationDetailResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "carrier_family": zod.string().nullish(),
+  "carrier_subtype": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "materials": zod.array(zod.string()),
+  "advantages": zod.array(zod.string()).describe('Beneficial outcomes and supporting mechanisms from the database'),
+  "limitations": zod.array(zod.string()).describe('Known limitations directly from the database records'),
+  "mechanisms": zod.array(zod.string()).describe('Delivery mechanism statements from the database'),
+  "papers": zod.array(zod.object({
+  "title": zod.string().nullable(),
+  "authors": zod.string().nullish(),
+  "journal": zod.string().nullish(),
+  "year": zod.number().nullish(),
+  "doi": zod.string().nullish()
+}))
+})
+
+
+/**
  * @summary Get database statistics
  */
 export const GetDatabaseStatsResponse = zod.object({

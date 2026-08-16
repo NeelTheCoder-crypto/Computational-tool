@@ -1,0 +1,1 @@
+- [Limitations/mechanisms join via experiment_id](limitations-experiment-join.md) — DB stores these at experiment level, not per-formulation; must join via experiment_id.

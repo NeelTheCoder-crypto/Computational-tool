@@ -496,7 +496,10 @@ export async function getFormulationById(
 
   if (!f) return null;
 
-  // Find arm_ids via formulation_cargos
+  // Find arm_ids AND experiment_ids via formulation_cargos → experimental_arms.
+  // Limitations and mechanisms in the DB are stored at the experiment level
+  // (under whichever formulation_id the extractor used as the lead), so we
+  // must join via experiment_id rather than directly via formulation_id.
   const { data: fcLinks } = await supabase
     .from("formulation_cargos")
     .select("formulation_cargo_id")
@@ -504,26 +507,36 @@ export async function getFormulationById(
 
   const fcIds = (fcLinks ?? []).map((fc) => fc.formulation_cargo_id);
 
-  const [materialsData, mechanismsData, limitationsData, armsData, paperData] =
+  const armsData = fcIds.length > 0
+    ? await supabase
+        .from("experimental_arms")
+        .select("arm_id, experiment_id")
+        .in("formulation_cargo_id", fcIds)
+    : { data: [] as { arm_id: string; experiment_id: string }[] };
+
+  const armIds = (armsData.data ?? []).map((a) => a.arm_id);
+  const experimentIds = [
+    ...new Set((armsData.data ?? []).map((a) => a.experiment_id).filter(Boolean)),
+  ];
+
+  const [materialsData, mechanismsData, limitationsData, paperData] =
     await Promise.all([
       supabase
         .from("formulation_materials")
         .select("materials(canonical_name)")
         .eq("formulation_id", id),
-      supabase
-        .from("mechanisms")
-        .select("mechanism_statement")
-        .eq("formulation_id", id),
-      supabase
-        .from("limitations")
-        .select("limitation_statement")
-        .eq("formulation_id", id),
-      fcIds.length > 0
+      experimentIds.length > 0
         ? supabase
-            .from("experimental_arms")
-            .select("arm_id")
-            .in("formulation_cargo_id", fcIds)
-        : Promise.resolve({ data: [] as { arm_id: string }[] }),
+            .from("mechanisms")
+            .select("mechanism_statement")
+            .in("experiment_id", experimentIds)
+        : Promise.resolve({ data: [] as { mechanism_statement: string | null }[] }),
+      experimentIds.length > 0
+        ? supabase
+            .from("limitations")
+            .select("limitation_statement")
+            .in("experiment_id", experimentIds)
+        : Promise.resolve({ data: [] as { limitation_statement: string | null }[] }),
       f.paper_id
         ? supabase
             .from("papers")
@@ -532,8 +545,6 @@ export async function getFormulationById(
             .single()
         : Promise.resolve({ data: null }),
     ]);
-
-  const armIds = (armsData.data ?? []).map((a) => a.arm_id);
 
   const outcomesData =
     armIds.length > 0

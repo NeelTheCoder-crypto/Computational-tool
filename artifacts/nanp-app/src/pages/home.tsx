@@ -4,7 +4,6 @@ import {
   useGetRouteOptions,
   useGetFormulationOptions,
   useGetFormulationDetail,
-  useGetDatabaseStats,
 } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,10 +18,6 @@ import {
 } from '@/components/ui/command';
 import {
   Database,
-  FileText,
-  FlaskConical,
-  Beaker,
-  Activity,
   ChevronsUpDown,
   Check,
   CheckCircle2,
@@ -306,7 +301,6 @@ export default function Home() {
   useEffect(() => { setRoute(''); setFormulationId(''); setFormulationName(''); }, [disease]);
   useEffect(() => { setFormulationId(''); setFormulationName(''); }, [route]);
 
-  const { data: stats } = useGetDatabaseStats();
   const { data: diseasesData, isLoading: loadingDiseases } = useGetDiseaseOptions();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: routesData, isLoading: loadingRoutes } = useGetRouteOptions(
@@ -409,24 +403,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Stats ticker */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 border-t border-border/50 pt-8 mt-8">
-            {[
-              { icon: FileText, label: 'Papers', value: stats.total_papers },
-              { icon: FlaskConical, label: 'Formulations', value: stats.total_formulations },
-              { icon: Beaker, label: 'Materials', value: stats.total_materials },
-              { icon: Database, label: 'Experiments', value: stats.total_experiments },
-              { icon: Activity, label: 'Outcomes', value: stats.total_biological_outcomes },
-            ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="flex flex-col items-center text-center p-2">
-                <Icon className="text-muted-foreground mb-2 h-5 w-5" />
-                <span className="text-2xl font-serif text-foreground">{value.toLocaleString()}</span>
-                <span className="text-xs text-muted-foreground uppercase tracking-wider mt-1">{label}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </main>
     </div>
   );

@@ -290,7 +290,9 @@ export default function Home() {
   useEffect(() => { setFormulationId(''); setFormulationName(''); }, [route]);
 
   const { data: diseasesData, isLoading: loadingDiseases } = useGetDiseaseOptions();
-  const { data: routesData, isLoading: loadingRoutes } = useGetRouteOptions();
+  const { data: routesData, isLoading: loadingRoutes } = useGetRouteOptions(
+    disease ? { disease } : undefined
+  );
   const { data: matchData, isLoading: loadingFormulations } = useQuery({
     queryKey: ['carriers-match', disease, route],
     queryFn: () => matchCarriers({ disease: disease || undefined, route: route || undefined }),

@@ -245,7 +245,14 @@ paths:
       operationId: getRouteOptions
       tags: [options]
       summary: Get routes of administration
-      description: Returns distinct routes of administration from the database, deduplicated and alphabetized
+      description: Returns distinct routes of administration from the database, deduplicated and alphabetized. When `disease` is provided, only routes that have ≥1 matching formulation for that disease are returned.
+      parameters:
+        - name: disease
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter to routes that have evidence for this disease model
       responses:
         "200":
           description: List of route values

@@ -3,6 +3,7 @@ import {
   getCargos,
   getDiseases,
   getRoutes,
+  getRoutesForDisease,
   getFilterOptions,
 } from "../lib/supabaseQueries.js";
 
@@ -25,7 +26,8 @@ router.get("/options/diseases", async (req, res): Promise<void> => {
 });
 
 router.get("/options/routes", async (req, res): Promise<void> => {
-  const values = await getRoutes();
+  const disease = typeof req.query.disease === "string" ? req.query.disease : undefined;
+  const values = disease ? await getRoutesForDisease(disease) : await getRoutes();
   res.json({ values });
 });
 

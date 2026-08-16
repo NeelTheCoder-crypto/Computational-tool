@@ -940,21 +940,27 @@ export function useGetDiseaseOptions<TData = Awaited<ReturnType<typeof getDiseas
 
 
 
-export const getGetRouteOptionsUrl = () => {
+export type GetRouteOptionsParams = {
+  /** Filter to routes that have evidence for this disease model */
+  disease?: string;
+};
 
-
-
-
-  return `/api/options/routes`
+export const getGetRouteOptionsUrl = (params?: GetRouteOptionsParams) => {
+  const searchParams = new URLSearchParams();
+  if (params?.disease) searchParams.set('disease', params.disease);
+  const qs = searchParams.toString();
+  return qs ? `/api/options/routes?${qs}` : `/api/options/routes`;
 }
 
 /**
- * Returns distinct routes of administration from the database, deduplicated and alphabetized
+ * Returns distinct routes of administration from the database, deduplicated and
+ * alphabetized. When `disease` is provided, only routes with ≥1 matching
+ * formulation for that disease are returned.
  * @summary Get routes of administration
  */
-export const getRouteOptions = async ( options?: RequestInit): Promise<OptionList> => {
+export const getRouteOptions = async (params?: GetRouteOptionsParams, options?: RequestInit): Promise<OptionList> => {
 
-  return customFetch<OptionList>(getGetRouteOptionsUrl(),
+  return customFetch<OptionList>(getGetRouteOptionsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -966,25 +972,24 @@ export const getRouteOptions = async ( options?: RequestInit): Promise<OptionLis
 
 
 
-
-export const getGetRouteOptionsQueryKey = () => {
+export const getGetRouteOptionsQueryKey = (params?: GetRouteOptionsParams) => {
     return [
-    `/api/options/routes`
+    `/api/options/routes`,
+    ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetRouteOptionsQueryOptions = <TData = Awaited<ReturnType<typeof getRouteOptions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetRouteOptionsQueryOptions = <TData = Awaited<ReturnType<typeof getRouteOptions>>, TError = ErrorType<unknown>>(params?: GetRouteOptionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetRouteOptionsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetRouteOptionsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRouteOptions>>> = ({ signal }) => getRouteOptions({ signal, ...requestOptions });
-
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRouteOptions>>> = ({ signal }) => getRouteOptions(params, { signal, ...requestOptions });
 
 
 
@@ -1001,11 +1006,12 @@ export type GetRouteOptionsQueryError = ErrorType<unknown>
  */
 
 export function useGetRouteOptions<TData = Awaited<ReturnType<typeof getRouteOptions>>, TError = ErrorType<unknown>>(
+  params?: GetRouteOptionsParams,
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRouteOptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetRouteOptionsQueryOptions(options)
+  const queryOptions = getGetRouteOptionsQueryOptions(params, options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

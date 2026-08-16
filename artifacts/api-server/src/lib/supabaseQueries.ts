@@ -859,6 +859,23 @@ export async function getRoutes(): Promise<string[]> {
   return Array.from(new Set(routes.filter(Boolean))).sort();
 }
 
+/**
+ * Routes that have ≥1 formulation matching the given disease.
+ * Uses the same graph/matching logic as matchCarriers so the results are
+ * guaranteed consistent — no route is offered that would return zero results.
+ */
+export async function getRoutesForDisease(disease: string): Promise<string[]> {
+  const graph = await loadGraph();
+  const matched = matchFormulationIds(graph, { disease });
+  const routes = new Set<string>();
+  for (const [, info] of matched) {
+    for (const arm of info.matchingArms) {
+      if (arm.route) routes.add(arm.route);
+    }
+  }
+  return [...routes].sort();
+}
+
 export interface FilterOptions {
   cargo_types: string[];
   diseases: string[];

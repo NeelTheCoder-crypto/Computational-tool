@@ -221,9 +221,14 @@ function DetailPanel({ formulationId }: { formulationId: string }) {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground italic">
-                No advantage records in database.
-              </p>
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  No records in database
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  This formulation has no advantage or mechanism entries extracted from the literature yet.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -246,9 +251,14 @@ function DetailPanel({ formulationId }: { formulationId: string }) {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground italic">
-                No limitation records in database.
-              </p>
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  No records in database
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  This formulation has no limitation entries extracted from the literature yet.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>

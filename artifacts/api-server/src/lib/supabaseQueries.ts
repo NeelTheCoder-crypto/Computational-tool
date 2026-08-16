@@ -397,7 +397,9 @@ export interface FormulationDetailRecord {
   }>;
 }
 
-/** Routes that have experimental evidence for the given disease model */
+/** Routes that have experimental evidence for the given disease model.
+ *  Only returns routes where at least one arm also has a formulation linked
+ *  (formulation_cargo_id IS NOT NULL), so every route shown leads to results. */
 export async function getRoutesForDisease(disease: string): Promise<string[]> {
   const { data: models } = await supabase
     .from("models")
@@ -413,11 +415,14 @@ export async function getRoutesForDisease(disease: string): Promise<string[]> {
 
   if (!experiments?.length) return [];
 
+  // Require formulation_cargo_id to be non-null so only routes that
+  // produce formulations are shown (avoids dead-end route selections).
   const { data: arms } = await supabase
     .from("experimental_arms")
     .select("administration_route")
     .in("experiment_id", experiments.map((e) => e.experiment_id))
-    .not("administration_route", "is", null);
+    .not("administration_route", "is", null)
+    .not("formulation_cargo_id", "is", null);
 
   return Array.from(
     new Set((arms ?? []).map((a) => a.administration_route as string).filter(Boolean))
@@ -611,23 +616,17 @@ export async function getDiseases(): Promise<string[]> {
   return Array.from(new Set(data.map((r) => r.disease_model as string).filter(Boolean))).sort();
 }
 
-/** Distinct routes of administration from experimental_arms and formulations */
+/** Distinct routes of administration from experimental_arms only.
+ *  Using a single source keeps this consistent with getRoutesForDisease(),
+ *  which also joins through experimental_arms. Including formulations.intended_route
+ *  caused ghost routes that returned zero formulations. */
 export async function getRoutes(): Promise<string[]> {
-  const [armsResult, formulationsResult] = await Promise.all([
-    supabase
-      .from("experimental_arms")
-      .select("administration_route")
-      .not("administration_route", "is", null),
-    supabase
-      .from("formulations")
-      .select("intended_route")
-      .not("intended_route", "is", null),
-  ]);
-  const routes = [
-    ...((armsResult.data ?? []).map((r) => r.administration_route as string)),
-    ...((formulationsResult.data ?? []).map((r) => r.intended_route as string)),
-  ];
-  return Array.from(new Set(routes.filter(Boolean))).sort();
+  const { data, error } = await supabase
+    .from("experimental_arms")
+    .select("administration_route")
+    .not("administration_route", "is", null);
+  if (error || !data) return [];
+  return Array.from(new Set(data.map((r) => r.administration_route as string).filter(Boolean))).sort();
 }
 
 // ── Database statistics ───────────────────────────────────────────────────────

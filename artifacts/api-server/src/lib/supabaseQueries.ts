@@ -554,12 +554,23 @@ export async function getFormulationById(
     .map((m) => m.mechanism_statement)
     .filter(Boolean) as string[];
 
-  const advantageOutcomes = (outcomesData.data ?? [])
+  // Include all non-adverse outcomes as advantages:
+  //   - "beneficial" = clearly good result
+  //   - "neutral" with any direction other than no_change = observed efficacy
+  //     (DB marks many positive findings "neutral" when there's no comparator)
+  // "adverse" outcomes go into the limitations list below.
+  const outcomeRows = outcomesData.data ?? [];
+  const advantageOutcomes = outcomeRows
     .filter(
       (o) =>
         o.result_polarity === "beneficial" ||
-        o.direction_vs_comparator === "improved"
+        (o.result_polarity === "neutral" && o.direction_vs_comparator !== "no_change")
     )
+    .map((o) => o.result_interpretation ?? o.value_text)
+    .filter(Boolean) as string[];
+
+  const adverseOutcomes = outcomeRows
+    .filter((o) => o.result_polarity === "adverse")
     .map((o) => o.result_interpretation ?? o.value_text)
     .filter(Boolean) as string[];
 
@@ -576,9 +587,10 @@ export async function getFormulationById(
       .map((m) => (m.materials as any)?.canonical_name)
       .filter(Boolean) as string[],
     advantages: [...new Set([...advantageOutcomes, ...mechanismStatements])],
-    limitations: (limitationsData.data ?? [])
-      .map((l) => l.limitation_statement)
-      .filter(Boolean) as string[],
+    limitations: [
+      ...(limitationsData.data ?? []).map((l) => l.limitation_statement).filter(Boolean) as string[],
+      ...adverseOutcomes,
+    ],
     mechanisms: mechanismStatements,
     papers: paper
       ? [

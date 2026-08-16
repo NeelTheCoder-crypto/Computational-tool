@@ -13,54 +13,351 @@ export interface ApiError {
   error: string;
 }
 
+export interface CarrierMatchInput {
+  /**
+     * Nucleic-acid / cargo type (e.g. mRNA, siRNA, plasmid_DNA)
+     * @nullable
+     */
+  cargo_type?: string | null;
+  /**
+     * Disease model (e.g. cystic fibrosis, lung cancer)
+     * @nullable
+     */
+  disease?: string | null;
+  /**
+     * Administration route (e.g. inhalation, intratracheal)
+     * @nullable
+     */
+  route?: string | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  page?: number | null;
+  /**
+     * @minimum 1
+     * @maximum 200
+     * @nullable
+     */
+  page_size?: number | null;
+}
+
+export interface RecommendationInput {
+  /** The therapeutic nucleic acid / cargo type (e.g. mRNA, siRNA, plasmid_DNA) */
+  nucleic_acid: string;
+  /** The target disease model */
+  disease: string;
+  /** The intended delivery route (e.g. inhalation, intratracheal) */
+  route_of_administration: string;
+}
+
+export interface PaperSummary {
+  paper_id: string;
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  authors_text?: string | null;
+  /** @nullable */
+  journal?: string | null;
+  /** @nullable */
+  publication_year?: number | null;
+  /** @nullable */
+  doi?: string | null;
+  /** @nullable */
+  url?: string | null;
+  /** @nullable */
+  publication_type?: string | null;
+}
+
+export interface CarrierMaterial {
+  material_id: string;
+  /** @nullable */
+  canonical_name?: string | null;
+  /** @nullable */
+  abbreviation?: string | null;
+  /** @nullable */
+  material_class?: string | null;
+  /** @nullable */
+  material_role?: string | null;
+}
+
+export interface CarrierCargo {
+  cargo_id: string;
+  /** @nullable */
+  canonical_name?: string | null;
+  /** @nullable */
+  cargo_type?: string | null;
+  /** @nullable */
+  cargo_role?: string | null;
+}
+
+export interface CarrierMatch {
+  formulation_id: string;
+  /** @nullable */
+  formulation_name?: string | null;
+  /** @nullable */
+  carrier_family?: string | null;
+  /** @nullable */
+  carrier_subtype?: string | null;
+  /** @nullable */
+  architecture?: string | null;
+  /** @nullable */
+  optimized_flag?: boolean | null;
+  /** @nullable */
+  intended_route?: string | null;
+  /** @nullable */
+  intended_mucosal_site?: string | null;
+  /** @nullable */
+  description?: string | null;
+  paper?: PaperSummary | null;
+  materials: CarrierMaterial[];
+  cargos: CarrierCargo[];
+  matched_cargo_types: string[];
+  matched_routes: string[];
+  matched_disease_models: string[];
+  matching_arm_count: number;
+  supporting_outcome_count: number;
+  favorable_outcome_count: number;
+  adverse_outcome_count: number;
+  score: number;
+}
+
+export interface AppliedFilters {
+  /** @nullable */
+  cargoType?: string | null;
+  /** @nullable */
+  disease?: string | null;
+  /** @nullable */
+  route?: string | null;
+}
+
+export interface CarrierMatchResult {
+  total: number;
+  page: number;
+  page_size: number;
+  filters: AppliedFilters;
+  items: CarrierMatch[];
+}
+
+export type AiSynthesisConfidence = typeof AiSynthesisConfidence[keyof typeof AiSynthesisConfidence];
+
+
+export const AiSynthesisConfidence = {
+  high: 'high',
+  moderate: 'moderate',
+  low: 'low',
+} as const;
+
+export interface AiSynthesis {
+  recommended_carrier: string;
+  confidence: AiSynthesisConfidence;
+  scientific_rationale: string;
+  key_components?: string[];
+  advantages?: string[];
+  limitations?: string[];
+}
+
+export interface RecommendationResult {
+  filters: AppliedFilters;
+  /** Authoritative ranked list from the database */
+  ranked_carriers: CarrierMatch[];
+  /** Secondary AI narrative grounded in the ranked carriers */
+  ai_synthesis: AiSynthesis | null;
+}
+
+export interface FormulationListItem {
+  formulation_id: string;
+  /** @nullable */
+  formulation_name?: string | null;
+  /** @nullable */
+  carrier_family?: string | null;
+  /** @nullable */
+  carrier_subtype?: string | null;
+  /** @nullable */
+  architecture?: string | null;
+  /** @nullable */
+  optimized_flag?: boolean | null;
+  /** @nullable */
+  intended_route?: string | null;
+  /** @nullable */
+  intended_mucosal_site?: string | null;
+  /** @nullable */
+  paper_id?: string | null;
+}
+
+export interface FormulationListResult {
+  total: number;
+  page: number;
+  page_size: number;
+  items: FormulationListItem[];
+}
+
+export interface FormulationTargeting {
+  targeting_id: string;
+  /** @nullable */
+  target_type?: string | null;
+  /** @nullable */
+  target_name?: string | null;
+  /** @nullable */
+  target_cell_type?: string | null;
+  /** @nullable */
+  targeting_strategy?: string | null;
+}
+
+export interface FormulationProcess {
+  process_id: string;
+  /** @nullable */
+  process_stage?: string | null;
+  /** @nullable */
+  method?: string | null;
+  /** @nullable */
+  device?: string | null;
+}
+
+export interface PhysicochemicalMeasurement {
+  measurement_id: string;
+  /** @nullable */
+  metric_code?: string | null;
+  /** @nullable */
+  value_numeric?: number | null;
+  /** @nullable */
+  value_text?: string | null;
+  /** @nullable */
+  unit?: string | null;
+}
+
+export interface Outcome {
+  outcome_id: string;
+  /** @nullable */
+  arm_id?: string | null;
+  /** @nullable */
+  outcome_domain?: string | null;
+  /** @nullable */
+  metric_code?: string | null;
+  /** @nullable */
+  target_tissue?: string | null;
+  /** @nullable */
+  value_numeric?: number | null;
+  /** @nullable */
+  value_operator?: string | null;
+  /** @nullable */
+  value_text?: string | null;
+  /** @nullable */
+  unit?: string | null;
+  /** @nullable */
+  direction_vs_comparator?: string | null;
+  /** @nullable */
+  result_polarity?: string | null;
+  /** @nullable */
+  fold_change?: number | null;
+  /** @nullable */
+  p_value?: number | null;
+  /** @nullable */
+  result_interpretation?: string | null;
+}
+
+export interface FormulationArm {
+  arm_id: string;
+  /** @nullable */
+  arm_name?: string | null;
+  /** @nullable */
+  administration_route?: string | null;
+  /** @nullable */
+  administration_site?: string | null;
+  /** @nullable */
+  delivery_device?: string | null;
+  /** @nullable */
+  dose_value?: number | null;
+  /** @nullable */
+  dose_unit?: string | null;
+  /** @nullable */
+  number_of_doses?: number | null;
+  /** @nullable */
+  experiment_type?: string | null;
+  /** @nullable */
+  objective?: string | null;
+  /** @nullable */
+  disease_model?: string | null;
+  /** @nullable */
+  species?: string | null;
+  outcomes: Outcome[];
+}
+
+export interface FormulationDetail {
+  formulation_id: string;
+  /** @nullable */
+  formulation_name?: string | null;
+  /** @nullable */
+  carrier_family?: string | null;
+  /** @nullable */
+  carrier_subtype?: string | null;
+  /** @nullable */
+  architecture?: string | null;
+  /** @nullable */
+  optimized_flag?: boolean | null;
+  /** @nullable */
+  intended_route?: string | null;
+  /** @nullable */
+  intended_mucosal_site?: string | null;
+  /** @nullable */
+  description?: string | null;
+  paper?: PaperSummary | null;
+  materials: CarrierMaterial[];
+  cargos: CarrierCargo[];
+  targeting: FormulationTargeting[];
+  processes: FormulationProcess[];
+  physicochemical: PhysicochemicalMeasurement[];
+  arms: FormulationArm[];
+}
+
+export interface OutcomeListResult {
+  total: number;
+  page: number;
+  page_size: number;
+  items: Outcome[];
+}
+
+export interface MaterialListItem {
+  material_id: string;
+  /** @nullable */
+  canonical_name?: string | null;
+  /** @nullable */
+  abbreviation?: string | null;
+  /** @nullable */
+  material_class?: string | null;
+  /** @nullable */
+  chemical_subclass?: string | null;
+  /** @nullable */
+  ionizable_flag?: boolean | null;
+  /** @nullable */
+  apparent_pka?: number | null;
+  /** @nullable */
+  molecular_weight_da?: number | null;
+}
+
+export interface MaterialListResult {
+  total: number;
+  page: number;
+  page_size: number;
+  items: MaterialListItem[];
+}
+
+export interface PaperListResult {
+  total: number;
+  page: number;
+  page_size: number;
+  items: PaperSummary[];
+}
+
 export interface OptionList {
   /** Distinct values from the database, alphabetically sorted */
   values: string[];
 }
 
-export interface FormulationSummary {
-  id: string;
-  name: string;
-  /** @nullable */
-  carrier_family?: string | null;
-  /** @nullable */
-  carrier_subtype?: string | null;
-}
-
-export interface FormulationList {
-  formulations: FormulationSummary[];
-}
-
-export interface FormulationPaper {
-  /** @nullable */
-  title: string | null;
-  /** @nullable */
-  authors?: string | null;
-  /** @nullable */
-  journal?: string | null;
-  /** @nullable */
-  year?: number | null;
-  /** @nullable */
-  doi?: string | null;
-}
-
-export interface FormulationDetail {
-  id: string;
-  name: string;
-  /** @nullable */
-  carrier_family?: string | null;
-  /** @nullable */
-  carrier_subtype?: string | null;
-  /** @nullable */
-  description?: string | null;
-  materials: string[];
-  /** Beneficial outcomes and supporting mechanisms from the database */
-  advantages: string[];
-  /** Known limitations directly from the database records */
-  limitations: string[];
-  /** Delivery mechanism statements from the database */
-  mechanisms: string[];
-  papers: FormulationPaper[];
+export interface FilterOptions {
+  cargo_types: string[];
+  diseases: string[];
+  routes: string[];
 }
 
 export interface DatabaseStats {
@@ -71,15 +368,90 @@ export interface DatabaseStats {
   total_biological_outcomes: number;
 }
 
-export type GetRouteOptionsParams = {
 /**
- * When provided, returns only routes that have evidence for this disease model
+ * Case-insensitive text search across key fields
  */
-disease?: string;
+export type SearchParameter = string;
+
+/**
+ * 1-based page number
+ */
+export type PageParameter = number;
+
+/**
+ * Number of records per page
+ */
+export type PageSizeParameter = number;
+
+export type ListFormulationsParams = {
+/**
+ * Case-insensitive text search across key fields
+ */
+search?: SearchParameter;
+/**
+ * 1-based page number
+ * @minimum 1
+ */
+page?: PageParameter;
+/**
+ * Number of records per page
+ * @minimum 1
+ * @maximum 200
+ */
+page_size?: PageSizeParameter;
 };
 
-export type GetFormulationOptionsParams = {
-disease: string;
-route: string;
+export type ListMaterialsParams = {
+/**
+ * Case-insensitive text search across key fields
+ */
+search?: SearchParameter;
+/**
+ * 1-based page number
+ * @minimum 1
+ */
+page?: PageParameter;
+/**
+ * Number of records per page
+ * @minimum 1
+ * @maximum 200
+ */
+page_size?: PageSizeParameter;
+};
+
+export type ListPapersParams = {
+/**
+ * Case-insensitive text search across key fields
+ */
+search?: SearchParameter;
+/**
+ * 1-based page number
+ * @minimum 1
+ */
+page?: PageParameter;
+/**
+ * Number of records per page
+ * @minimum 1
+ * @maximum 200
+ */
+page_size?: PageSizeParameter;
+};
+
+export type ListOutcomesParams = {
+/**
+ * Case-insensitive text search across key fields
+ */
+search?: SearchParameter;
+/**
+ * 1-based page number
+ * @minimum 1
+ */
+page?: PageParameter;
+/**
+ * Number of records per page
+ * @minimum 1
+ * @maximum 200
+ */
+page_size?: PageSizeParameter;
 };
 

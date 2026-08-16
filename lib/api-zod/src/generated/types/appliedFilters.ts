@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface FormulationSummary {
-  id: string;
-  name: string;
+export interface AppliedFilters {
   /** @nullable */
-  carrier_family?: string | null;
+  cargoType?: string | null;
   /** @nullable */
-  carrier_subtype?: string | null;
+  disease?: string | null;
+  /** @nullable */
+  route?: string | null;
 }

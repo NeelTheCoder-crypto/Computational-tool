@@ -10,10 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: carriers
+    description: Carrier matching and ranking
+  - name: browse
+    description: Browse and detail operations over database records
+  - name: recommend
+    description: AI-synthesized carrier recommendation
   - name: options
-    description: Cascading dropdown options
-  - name: formulations
-    description: Formulation explorer
+    description: Filter option values
   - name: stats
     description: Database statistics
 paths:
@@ -22,6 +26,7 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
+      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -30,70 +35,97 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
-  /options/diseases:
-    get:
-      operationId: getDiseaseOptions
-      tags: [options]
-      summary: All disease models in the database
+  /carriers/match:
+    post:
+      operationId: matchCarriers
+      tags: [carriers]
+      summary: Match and rank carriers for a filter combination
+      description: >
+        Accepts any combination of cargo type, disease, and route and returns the
+        carrier formulations the database actually links to that combination, ranked
+        by strength of database support. Partial filters narrow correctly; an empty
+        filter returns everything (paged). Never returns the whole table when filters
+        are set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CarrierMatchInput"
       responses:
         "200":
-          description: List of disease values
+          description: Ranked list of matching carriers
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OptionList"
+                $ref: "#/components/schemas/CarrierMatchResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 
-  /options/routes:
+  /recommend:
+    post:
+      operationId: getRecommendation
+      tags: [recommend]
+      summary: Get AI-synthesized carrier recommendation
+      description: >
+        Runs the same database filter/ranking as /carriers/match, then feeds only the
+        truly-filtered top carriers to an LLM that produces a secondary narrative. The
+        ranked database results are authoritative; the narrative is supplementary.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendationInput"
+      responses:
+        "200":
+          description: Ranked carriers plus AI narrative
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendationResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /formulations:
     get:
-      operationId: getRouteOptions
-      tags: [options]
-      summary: Routes of administration, optionally filtered by disease
+      operationId: listFormulations
+      tags: [browse]
+      summary: Browse formulations
+      description: Paged, text-searchable list of carrier formulations
       parameters:
-        - name: disease
-          in: query
-          required: false
-          description: When provided, returns only routes that have evidence for this disease model
-          schema:
-            type: string
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
       responses:
         "200":
-          description: List of route values
+          description: Paged formulations
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OptionList"
+                $ref: "#/components/schemas/FormulationListResult"
 
-  /options/formulations:
-    get:
-      operationId: getFormulationOptions
-      tags: [options]
-      summary: Formulations studied for a specific disease and route
-      parameters:
-        - name: disease
-          in: query
-          required: true
-          schema:
-            type: string
-        - name: route
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: List of matching formulations
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FormulationList"
-
-  /formulation/{id}:
+  /formulations/{formulationId}:
     get:
       operationId: getFormulationDetail
-      tags: [formulations]
-      summary: Full detail for one formulation — advantages, limitations, materials, papers
+      tags: [browse]
+      summary: Get one formulation with all related records
       parameters:
-        - name: id
+        - name: formulationId
           in: path
           required: true
           schema:
@@ -112,11 +144,122 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
+  /materials:
+    get:
+      operationId: listMaterials
+      tags: [browse]
+      summary: Browse materials
+      description: Paged, text-searchable list of materials
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Paged materials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialListResult"
+
+  /papers:
+    get:
+      operationId: listPapers
+      tags: [browse]
+      summary: Browse papers
+      description: Paged, text-searchable list of source papers
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Paged papers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaperListResult"
+
+  /outcomes:
+    get:
+      operationId: listOutcomes
+      tags: [browse]
+      summary: Browse biological outcomes
+      description: Paged, text-searchable list of biological outcomes
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Paged outcomes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutcomeListResult"
+
+  /options:
+    get:
+      operationId: getFilterOptions
+      tags: [options]
+      summary: Get all filter option values
+      description: Returns distinct cargo types, diseases, and routes from the database
+      responses:
+        "200":
+          description: Filter options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilterOptions"
+
+  /options/cargos:
+    get:
+      operationId: getCargoOptions
+      tags: [options]
+      summary: Get nucleic acid / cargo types
+      description: Returns distinct cargo types from the database, deduplicated and alphabetized
+      responses:
+        "200":
+          description: List of cargo types
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OptionList"
+
+  /options/diseases:
+    get:
+      operationId: getDiseaseOptions
+      tags: [options]
+      summary: Get disease / disease model values
+      description: Returns distinct disease models from the database, deduplicated and alphabetized
+      responses:
+        "200":
+          description: List of disease values
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OptionList"
+
+  /options/routes:
+    get:
+      operationId: getRouteOptions
+      tags: [options]
+      summary: Get routes of administration
+      description: Returns distinct routes of administration from the database, deduplicated and alphabetized
+      responses:
+        "200":
+          description: List of route values
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OptionList"
+
   /stats:
     get:
       operationId: getDatabaseStats
       tags: [stats]
       summary: Get database statistics
+      description: Returns summary statistics about the scientific literature database
       responses:
         "200":
           description: Database statistics
@@ -126,83 +269,275 @@ paths:
                 $ref: "#/components/schemas/DatabaseStats"
 
 components:
+  parameters:
+    Search:
+      name: search
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Case-insensitive text search across key fields
+    Page:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: 1-based page number
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+      description: Number of records per page
+
   schemas:
     HealthStatus:
       type: object
-      required: [status]
       properties:
         status:
           type: string
+      required:
+        - status
 
     ApiError:
       type: object
-      required: [error]
       properties:
         error:
           type: string
+      required:
+        - error
 
-    OptionList:
+    CarrierMatchInput:
       type: object
-      required: [values]
       properties:
-        values:
-          type: array
-          items:
-            type: string
-          description: Distinct values from the database, alphabetically sorted
-
-    FormulationSummary:
-      type: object
-      required: [id, name]
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        carrier_family:
+        cargo_type:
           type: ["string", "null"]
-        carrier_subtype:
+          description: Nucleic-acid / cargo type (e.g. mRNA, siRNA, plasmid_DNA)
+        disease:
           type: ["string", "null"]
+          description: Disease model (e.g. cystic fibrosis, lung cancer)
+        route:
+          type: ["string", "null"]
+          description: Administration route (e.g. inhalation, intratracheal)
+        page:
+          type: ["integer", "null"]
+          minimum: 1
+        page_size:
+          type: ["integer", "null"]
+          minimum: 1
+          maximum: 200
 
-    FormulationList:
+    RecommendationInput:
       type: object
-      required: [formulations]
+      required:
+        - nucleic_acid
+        - disease
+        - route_of_administration
       properties:
-        formulations:
-          type: array
-          items:
-            $ref: "#/components/schemas/FormulationSummary"
+        nucleic_acid:
+          type: string
+          description: The therapeutic nucleic acid / cargo type (e.g. mRNA, siRNA, plasmid_DNA)
+        disease:
+          type: string
+          description: The target disease model
+        route_of_administration:
+          type: string
+          description: The intended delivery route (e.g. inhalation, intratracheal)
 
-    FormulationPaper:
+    PaperSummary:
       type: object
-      required: [title]
+      required:
+        - paper_id
       properties:
+        paper_id:
+          type: string
         title:
           type: ["string", "null"]
-        authors:
+        authors_text:
           type: ["string", "null"]
         journal:
           type: ["string", "null"]
-        year:
+        publication_year:
           type: ["integer", "null"]
         doi:
           type: ["string", "null"]
+        url:
+          type: ["string", "null"]
+        publication_type:
+          type: ["string", "null"]
 
-    FormulationDetail:
+    CarrierMaterial:
       type: object
-      required: [id, name, advantages, limitations, mechanisms, materials, papers]
+      required:
+        - material_id
       properties:
-        id:
+        material_id:
           type: string
-        name:
+        canonical_name:
+          type: ["string", "null"]
+        abbreviation:
+          type: ["string", "null"]
+        material_class:
+          type: ["string", "null"]
+        material_role:
+          type: ["string", "null"]
+
+    CarrierCargo:
+      type: object
+      required:
+        - cargo_id
+      properties:
+        cargo_id:
           type: string
+        canonical_name:
+          type: ["string", "null"]
+        cargo_type:
+          type: ["string", "null"]
+        cargo_role:
+          type: ["string", "null"]
+
+    CarrierMatch:
+      type: object
+      required:
+        - formulation_id
+        - materials
+        - cargos
+        - matched_cargo_types
+        - matched_routes
+        - matched_disease_models
+        - matching_arm_count
+        - supporting_outcome_count
+        - favorable_outcome_count
+        - adverse_outcome_count
+        - score
+      properties:
+        formulation_id:
+          type: string
+        formulation_name:
+          type: ["string", "null"]
         carrier_family:
           type: ["string", "null"]
         carrier_subtype:
           type: ["string", "null"]
+        architecture:
+          type: ["string", "null"]
+        optimized_flag:
+          type: ["boolean", "null"]
+        intended_route:
+          type: ["string", "null"]
+        intended_mucosal_site:
+          type: ["string", "null"]
         description:
           type: ["string", "null"]
+        paper:
+          oneOf:
+            - $ref: "#/components/schemas/PaperSummary"
+            - type: "null"
         materials:
+          type: array
+          items:
+            $ref: "#/components/schemas/CarrierMaterial"
+        cargos:
+          type: array
+          items:
+            $ref: "#/components/schemas/CarrierCargo"
+        matched_cargo_types:
+          type: array
+          items:
+            type: string
+        matched_routes:
+          type: array
+          items:
+            type: string
+        matched_disease_models:
+          type: array
+          items:
+            type: string
+        matching_arm_count:
+          type: integer
+        supporting_outcome_count:
+          type: integer
+        favorable_outcome_count:
+          type: integer
+        adverse_outcome_count:
+          type: integer
+        score:
+          type: number
+
+    CarrierMatchResult:
+      type: object
+      required:
+        - total
+        - page
+        - page_size
+        - filters
+        - items
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        filters:
+          $ref: "#/components/schemas/AppliedFilters"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CarrierMatch"
+
+    AppliedFilters:
+      type: object
+      properties:
+        cargoType:
+          type: ["string", "null"]
+        disease:
+          type: ["string", "null"]
+        route:
+          type: ["string", "null"]
+
+    RecommendationResult:
+      type: object
+      required:
+        - filters
+        - ranked_carriers
+        - ai_synthesis
+      properties:
+        filters:
+          $ref: "#/components/schemas/AppliedFilters"
+        ranked_carriers:
+          type: array
+          items:
+            $ref: "#/components/schemas/CarrierMatch"
+          description: Authoritative ranked list from the database
+        ai_synthesis:
+          oneOf:
+            - $ref: "#/components/schemas/AiSynthesis"
+            - type: "null"
+          description: Secondary AI narrative grounded in the ranked carriers
+
+    AiSynthesis:
+      type: object
+      required:
+        - recommended_carrier
+        - confidence
+        - scientific_rationale
+      properties:
+        recommended_carrier:
+          type: string
+        confidence:
+          type: string
+          enum: [high, moderate, low]
+        scientific_rationale:
+          type: string
+        key_components:
           type: array
           items:
             type: string
@@ -210,21 +545,336 @@ components:
           type: array
           items:
             type: string
-          description: Beneficial outcomes and supporting mechanisms from the database
         limitations:
           type: array
           items:
             type: string
-          description: Known limitations directly from the database records
-        mechanisms:
+
+    FormulationListItem:
+      type: object
+      required:
+        - formulation_id
+      properties:
+        formulation_id:
+          type: string
+        formulation_name:
+          type: ["string", "null"]
+        carrier_family:
+          type: ["string", "null"]
+        carrier_subtype:
+          type: ["string", "null"]
+        architecture:
+          type: ["string", "null"]
+        optimized_flag:
+          type: ["boolean", "null"]
+        intended_route:
+          type: ["string", "null"]
+        intended_mucosal_site:
+          type: ["string", "null"]
+        paper_id:
+          type: ["string", "null"]
+
+    FormulationListResult:
+      type: object
+      required:
+        - total
+        - page
+        - page_size
+        - items
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormulationListItem"
+
+    FormulationDetail:
+      type: object
+      required:
+        - formulation_id
+        - materials
+        - cargos
+        - targeting
+        - processes
+        - physicochemical
+        - arms
+      properties:
+        formulation_id:
+          type: string
+        formulation_name:
+          type: ["string", "null"]
+        carrier_family:
+          type: ["string", "null"]
+        carrier_subtype:
+          type: ["string", "null"]
+        architecture:
+          type: ["string", "null"]
+        optimized_flag:
+          type: ["boolean", "null"]
+        intended_route:
+          type: ["string", "null"]
+        intended_mucosal_site:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        paper:
+          oneOf:
+            - $ref: "#/components/schemas/PaperSummary"
+            - type: "null"
+        materials:
+          type: array
+          items:
+            $ref: "#/components/schemas/CarrierMaterial"
+        cargos:
+          type: array
+          items:
+            $ref: "#/components/schemas/CarrierCargo"
+        targeting:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormulationTargeting"
+        processes:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormulationProcess"
+        physicochemical:
+          type: array
+          items:
+            $ref: "#/components/schemas/PhysicochemicalMeasurement"
+        arms:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormulationArm"
+
+    FormulationTargeting:
+      type: object
+      required:
+        - targeting_id
+      properties:
+        targeting_id:
+          type: string
+        target_type:
+          type: ["string", "null"]
+        target_name:
+          type: ["string", "null"]
+        target_cell_type:
+          type: ["string", "null"]
+        targeting_strategy:
+          type: ["string", "null"]
+
+    FormulationProcess:
+      type: object
+      required:
+        - process_id
+      properties:
+        process_id:
+          type: string
+        process_stage:
+          type: ["string", "null"]
+        method:
+          type: ["string", "null"]
+        device:
+          type: ["string", "null"]
+
+    PhysicochemicalMeasurement:
+      type: object
+      required:
+        - measurement_id
+      properties:
+        measurement_id:
+          type: string
+        metric_code:
+          type: ["string", "null"]
+        value_numeric:
+          type: ["number", "null"]
+        value_text:
+          type: ["string", "null"]
+        unit:
+          type: ["string", "null"]
+
+    FormulationArm:
+      type: object
+      required:
+        - arm_id
+        - outcomes
+      properties:
+        arm_id:
+          type: string
+        arm_name:
+          type: ["string", "null"]
+        administration_route:
+          type: ["string", "null"]
+        administration_site:
+          type: ["string", "null"]
+        delivery_device:
+          type: ["string", "null"]
+        dose_value:
+          type: ["number", "null"]
+        dose_unit:
+          type: ["string", "null"]
+        number_of_doses:
+          type: ["integer", "null"]
+        experiment_type:
+          type: ["string", "null"]
+        objective:
+          type: ["string", "null"]
+        disease_model:
+          type: ["string", "null"]
+        species:
+          type: ["string", "null"]
+        outcomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Outcome"
+
+    Outcome:
+      type: object
+      required:
+        - outcome_id
+      properties:
+        outcome_id:
+          type: string
+        arm_id:
+          type: ["string", "null"]
+        outcome_domain:
+          type: ["string", "null"]
+        metric_code:
+          type: ["string", "null"]
+        target_tissue:
+          type: ["string", "null"]
+        value_numeric:
+          type: ["number", "null"]
+        value_operator:
+          type: ["string", "null"]
+        value_text:
+          type: ["string", "null"]
+        unit:
+          type: ["string", "null"]
+        direction_vs_comparator:
+          type: ["string", "null"]
+        result_polarity:
+          type: ["string", "null"]
+        fold_change:
+          type: ["number", "null"]
+        p_value:
+          type: ["number", "null"]
+        result_interpretation:
+          type: ["string", "null"]
+
+    OutcomeListResult:
+      type: object
+      required:
+        - total
+        - page
+        - page_size
+        - items
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Outcome"
+
+    MaterialListItem:
+      type: object
+      required:
+        - material_id
+      properties:
+        material_id:
+          type: string
+        canonical_name:
+          type: ["string", "null"]
+        abbreviation:
+          type: ["string", "null"]
+        material_class:
+          type: ["string", "null"]
+        chemical_subclass:
+          type: ["string", "null"]
+        ionizable_flag:
+          type: ["boolean", "null"]
+        apparent_pka:
+          type: ["number", "null"]
+        molecular_weight_da:
+          type: ["number", "null"]
+
+    MaterialListResult:
+      type: object
+      required:
+        - total
+        - page
+        - page_size
+        - items
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialListItem"
+
+    PaperListResult:
+      type: object
+      required:
+        - total
+        - page
+        - page_size
+        - items
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaperSummary"
+
+    OptionList:
+      type: object
+      required:
+        - values
+      properties:
+        values:
           type: array
           items:
             type: string
-          description: Delivery mechanism statements from the database
-        papers:
+          description: Distinct values from the database, alphabetically sorted
+
+    FilterOptions:
+      type: object
+      required:
+        - cargo_types
+        - diseases
+        - routes
+      properties:
+        cargo_types:
           type: array
           items:
-            $ref: "#/components/schemas/FormulationPaper"
+            type: string
+        diseases:
+          type: array
+          items:
+            type: string
+        routes:
+          type: array
+          items:
+            type: string
 
     DatabaseStats:
       type: object

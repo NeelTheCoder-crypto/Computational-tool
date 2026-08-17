@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export type GetRouteOptionsParams = {
 /**
- * 1-based page number
+ * When provided, returns only routes that have evidence for this disease model
  */
-export type PageParameter = number;
+disease?: string;
+};

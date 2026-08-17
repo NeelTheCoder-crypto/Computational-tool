@@ -1,2 +1,1 @@
-- [NANP delivery DB](nanp-delivery-db.md) — Supabase schema quirks: UUID string PKs, arm-as-join-nexus for cargo/route/disease, route umbrella rule.
 - [Limitations/mechanisms join via experiment_id](limitations-experiment-join.md) — DB stores these at experiment level, not per-formulation; must join via experiment_id.

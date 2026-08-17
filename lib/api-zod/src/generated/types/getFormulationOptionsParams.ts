@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-/**
- * Case-insensitive text search across key fields
- */
-export type SearchParameter = string;
+export type GetFormulationOptionsParams = {
+disease: string;
+route: string;
+};

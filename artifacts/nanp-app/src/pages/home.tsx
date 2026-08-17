@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   useGetDiseaseOptions,
   useGetRouteOptions,
+  useGetFormulationOptions,
   useGetFormulationDetail,
-  matchCarriers,
 } from '@workspace/api-client-react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -161,7 +160,7 @@ function DetailPanel({ formulationId }: { formulationId: string }) {
       <div className="flex items-start gap-3 flex-wrap">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-serif font-medium text-foreground leading-tight">
-            {data.formulation_name}
+            {data.name}
           </h2>
           <div className="flex flex-wrap gap-2 mt-2">
             {data.carrier_family && (
@@ -190,86 +189,99 @@ function DetailPanel({ formulationId }: { formulationId: string }) {
                 key={i}
                 className="px-2.5 py-1 rounded-md bg-muted text-xs text-foreground font-mono"
               >
-                {m.canonical_name ?? m.abbreviation ?? m.material_id}
+                {m}
               </span>
             ))}
           </div>
         </div>
       )}
 
-      {/* Experimental evidence from arms */}
+      {/* Advantages & Limitations */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="border-emerald-200 bg-emerald-50/50 shadow-none">
           <CardHeader className="pb-3 pt-4 px-4">
             <CardTitle className="flex items-center gap-2 text-base text-emerald-800">
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              Experimental Arms
+              Advantages
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            {data.arms.length > 0 ? (
+            {data.advantages.length > 0 ? (
               <ul className="space-y-2.5">
-                {data.arms.map((arm, i) => (
+                {data.advantages.map((adv, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-emerald-900">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
-                    {arm.administration_route ?? 'Route unknown'}{arm.disease_model ? ` — ${arm.disease_model}` : ''}
+                    {adv}
                   </li>
                 ))}
               </ul>
             ) : (
               <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium text-muted-foreground">No experimental arms</p>
-                <p className="text-xs text-muted-foreground/70">No in-vivo or in-vitro arms recorded for this formulation.</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  No records in database
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  This formulation has no advantage or mechanism entries extracted from the literature yet.
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border-sky-200 bg-sky-50/50 shadow-none">
+        <Card className="border-rose-200 bg-rose-50/50 shadow-none">
           <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="flex items-center gap-2 text-base text-sky-800">
-              <AlertCircle className="h-4 w-4 text-sky-600" />
-              Cargo Types
+            <CardTitle className="flex items-center gap-2 text-base text-rose-800">
+              <AlertCircle className="h-4 w-4 text-rose-600" />
+              Limitations
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            {data.cargos.length > 0 ? (
+            {data.limitations.length > 0 ? (
               <ul className="space-y-2.5">
-                {data.cargos.map((c, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-sky-900">
-                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500 mt-1.5 shrink-0" />
-                    {c.canonical_name ?? c.cargo_id}{c.cargo_type ? ` (${c.cargo_type})` : ''}
+                {data.limitations.map((lim, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-rose-900">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+                    {lim}
                   </li>
                 ))}
               </ul>
             ) : (
               <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium text-muted-foreground">No cargo data</p>
-                <p className="text-xs text-muted-foreground/70">No cargo entries linked to this formulation.</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  No records in database
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  This formulation has no limitation entries extracted from the literature yet.
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Supporting paper */}
-      {data.paper && (
+      {/* Supporting papers */}
+      {data.papers.length > 0 && (
         <div>
           <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase mb-3">
             <BookOpen className="h-3.5 w-3.5" />
             Source Literature
           </h3>
           <div className="space-y-2">
-            <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
-              <p className="font-medium text-foreground leading-snug">
-                {data.paper.title ?? 'Untitled'}
-              </p>
-              <p className="text-muted-foreground mt-1 text-xs">
-                {[data.paper.authors_text, data.paper.journal, data.paper.publication_year, data.paper.doi ? `DOI: ${data.paper.doi}` : null]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </p>
-            </div>
+            {data.papers.map((p, i) => (
+              <div
+                key={i}
+                className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm"
+              >
+                <p className="font-medium text-foreground leading-snug">
+                  {p.title ?? 'Untitled'}
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {[p.authors, p.journal, p.year, p.doi ? `DOI: ${p.doi}` : null]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -290,18 +302,20 @@ export default function Home() {
   useEffect(() => { setFormulationId(''); setFormulationName(''); }, [route]);
 
   const { data: diseasesData, isLoading: loadingDiseases } = useGetDiseaseOptions();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: routesData, isLoading: loadingRoutes } = useGetRouteOptions(
-    disease ? { disease } : undefined
+    { disease: disease || undefined },
+    { query: { enabled: !!disease } as any }
   );
-  const { data: matchData, isLoading: loadingFormulations } = useQuery({
-    queryKey: ['carriers-match', disease, route],
-    queryFn: () => matchCarriers({ disease: disease || undefined, route: route || undefined }),
-    enabled: !!disease && !!route,
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: formulationsData, isLoading: loadingFormulations } = useGetFormulationOptions(
+    { disease, route },
+    { query: { enabled: !!disease && !!route } as any }
+  );
 
   const diseases = diseasesData?.values ?? [];
   const routes = routesData?.values ?? [];
-  const formulations = matchData?.items ?? [];
+  const formulations = formulationsData?.formulations ?? [];
 
   return (
     <div className="min-h-[100dvh] w-full flex flex-col scientific-grid">
@@ -369,12 +383,12 @@ export default function Home() {
                   : 'Select a formulation…'
               }
               searchPlaceholder="Search formulations…"
-              values={formulations.map((f) => f.formulation_name ?? f.formulation_id)}
+              values={formulations.map((f) => f.name)}
               selected={formulationName}
               onSelect={(name) => {
-                const match = formulations.find((f) => (f.formulation_name ?? f.formulation_id) === name);
+                const match = formulations.find((f) => f.name === name);
                 setFormulationName(name);
-                setFormulationId(match?.formulation_id ?? '');
+                setFormulationId(match?.id ?? '');
               }}
               disabled={!disease || !route}
               isLoading={!!disease && !!route && loadingFormulations}

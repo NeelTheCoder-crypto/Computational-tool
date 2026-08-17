@@ -5,37 +5,23 @@
  * NANP Carrier Selection Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { CarrierCargo } from './carrierCargo';
-import type { CarrierMaterial } from './carrierMaterial';
-import type { FormulationArm } from './formulationArm';
-import type { FormulationProcess } from './formulationProcess';
-import type { FormulationTargeting } from './formulationTargeting';
-import type { PaperSummary } from './paperSummary';
-import type { PhysicochemicalMeasurement } from './physicochemicalMeasurement';
+import type { FormulationPaper } from './formulationPaper';
 
 export interface FormulationDetail {
-  formulation_id: string;
-  /** @nullable */
-  formulation_name?: string | null;
+  id: string;
+  name: string;
   /** @nullable */
   carrier_family?: string | null;
   /** @nullable */
   carrier_subtype?: string | null;
   /** @nullable */
-  architecture?: string | null;
-  /** @nullable */
-  optimized_flag?: boolean | null;
-  /** @nullable */
-  intended_route?: string | null;
-  /** @nullable */
-  intended_mucosal_site?: string | null;
-  /** @nullable */
   description?: string | null;
-  paper?: PaperSummary | null;
-  materials: CarrierMaterial[];
-  cargos: CarrierCargo[];
-  targeting: FormulationTargeting[];
-  processes: FormulationProcess[];
-  physicochemical: PhysicochemicalMeasurement[];
-  arms: FormulationArm[];
+  materials: string[];
+  /** Beneficial outcomes and supporting mechanisms from the database */
+  advantages: string[];
+  /** Known limitations directly from the database records */
+  limitations: string[];
+  /** Delivery mechanism statements from the database */
+  mechanisms: string[];
+  papers: FormulationPaper[];
 }

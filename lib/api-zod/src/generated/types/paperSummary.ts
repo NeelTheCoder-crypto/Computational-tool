@@ -6,15 +6,20 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface FormulationPaper {
+export interface PaperSummary {
+  paper_id: string;
   /** @nullable */
-  title: string | null;
+  title?: string | null;
   /** @nullable */
-  authors?: string | null;
+  authors_text?: string | null;
   /** @nullable */
   journal?: string | null;
   /** @nullable */
-  year?: number | null;
+  publication_year?: number | null;
   /** @nullable */
   doi?: string | null;
+  /** @nullable */
+  url?: string | null;
+  /** @nullable */
+  publication_type?: string | null;
 }

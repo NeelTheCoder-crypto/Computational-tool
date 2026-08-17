@@ -5,8 +5,8 @@
  * NANP Carrier Selection Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { FormulationSummary } from './formulationSummary';
 
-export interface FormulationList {
-  formulations: FormulationSummary[];
-}
+/**
+ * Number of records per page
+ */
+export type PageSizeParameter = number;

@@ -9,6 +9,7 @@ import * as zod from 'zod';
 
 
 /**
+ * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -17,7 +18,404 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * @summary All disease models in the database
+ * Accepts any combination of cargo type, disease, and route and returns the carrier formulations the database actually links to that combination, ranked by strength of database support. Partial filters narrow correctly; an empty filter returns everything (paged). Never returns the whole table when filters are set.
+ * @summary Match and rank carriers for a filter combination
+ */
+
+export const matchCarriersBodyPageSizeMax = 200;
+
+
+
+export const MatchCarriersBody = zod.object({
+  "cargo_type": zod.string().nullish().describe('Nucleic-acid \/ cargo type (e.g. mRNA, siRNA, plasmid_DNA)'),
+  "disease": zod.string().nullish().describe('Disease model (e.g. cystic fibrosis, lung cancer)'),
+  "route": zod.string().nullish().describe('Administration route (e.g. inhalation, intratracheal)'),
+  "page": zod.number().min(1).nullish(),
+  "page_size": zod.number().min(1).max(matchCarriersBodyPageSizeMax).nullish()
+})
+
+export const MatchCarriersResponse = zod.object({
+  "total": zod.number(),
+  "page": zod.number(),
+  "page_size": zod.number(),
+  "filters": zod.object({
+  "cargoType": zod.string().nullish(),
+  "disease": zod.string().nullish(),
+  "route": zod.string().nullish()
+}),
+  "items": zod.array(zod.object({
+  "formulation_id": zod.string(),
+  "formulation_name": zod.string().nullish(),
+  "carrier_family": zod.string().nullish(),
+  "carrier_subtype": zod.string().nullish(),
+  "architecture": zod.string().nullish(),
+  "optimized_flag": zod.boolean().nullish(),
+  "intended_route": zod.string().nullish(),
+  "intended_mucosal_site": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "paper": zod.union([zod.object({
+  "paper_id": zod.string(),
+  "title": zod.string().nullish(),
+  "authors_text": zod.string().nullish(),
+  "journal": zod.string().nullish(),
+  "publication_year": zod.number().nullish(),
+  "doi": zod.string().nullish(),
+  "url": zod.string().nullish(),
+  "publication_type": zod.string().nullish()
+}),zod.null()]).optional(),
+  "materials": zod.array(zod.object({
+  "material_id": zod.string(),
+  "canonical_name": zod.string().nullish(),
+  "abbreviation": zod.string().nullish(),
+  "material_class": zod.string().nullish(),
+  "material_role": zod.string().nullish()
+})),
+  "cargos": zod.array(zod.object({
+  "cargo_id": zod.string(),
+  "canonical_name": zod.string().nullish(),
+  "cargo_type": zod.string().nullish(),
+  "cargo_role": zod.string().nullish()
+})),
+  "matched_cargo_types": zod.array(zod.string()),
+  "matched_routes": zod.array(zod.string()),
+  "matched_disease_models": zod.array(zod.string()),
+  "matching_arm_count": zod.number(),
+  "supporting_outcome_count": zod.number(),
+  "favorable_outcome_count": zod.number(),
+  "adverse_outcome_count": zod.number(),
+  "score": zod.number()
+}))
+})
+
+
+/**
+ * Runs the same database filter/ranking as /carriers/match, then feeds only the truly-filtered top carriers to an LLM that produces a secondary narrative. The ranked database results are authoritative; the narrative is supplementary.
+ * @summary Get AI-synthesized carrier recommendation
+ */
+export const GetRecommendationBody = zod.object({
+  "nucleic_acid": zod.string().describe('The therapeutic nucleic acid \/ cargo type (e.g. mRNA, siRNA, plasmid_DNA)'),
+  "disease": zod.string().describe('The target disease model'),
+  "route_of_administration": zod.string().describe('The intended delivery route (e.g. inhalation, intratracheal)')
+})
+
+export const GetRecommendationResponse = zod.object({
+  "filters": zod.object({
+  "cargoType": zod.string().nullish(),
+  "disease": zod.string().nullish(),
+  "route": zod.string().nullish()
+}),
+  "ranked_carriers": zod.array(zod.object({
+  "formulation_id": zod.string(),
+  "formulation_name": zod.string().nullish(),
+  "carrier_family": zod.string().nullish(),
+  "carrier_subtype": zod.string().nullish(),
+  "architecture": zod.string().nullish(),
+  "optimized_flag": zod.boolean().nullish(),
+  "intended_route": zod.string().nullish(),
+  "intended_mucosal_site": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "paper": zod.union([zod.object({
+  "paper_id": zod.string(),
+  "title": zod.string().nullish(),
+  "authors_text": zod.string().nullish(),
+  "journal": zod.string().nullish(),
+  "publication_year": zod.number().nullish(),
+  "doi": zod.string().nullish(),
+  "url": zod.string().nullish(),
+  "publication_type": zod.string().nullish()
+}),zod.null()]).optional(),
+  "materials": zod.array(zod.object({
+  "material_id": zod.string(),
+  "canonical_name": zod.string().nullish(),
+  "abbreviation": zod.string().nullish(),
+  "material_class": zod.string().nullish(),
+  "material_role": zod.string().nullish()
+})),
+  "cargos": zod.array(zod.object({
+  "cargo_id": zod.string(),
+  "canonical_name": zod.string().nullish(),
+  "cargo_type": zod.string().nullish(),
+  "cargo_role": zod.string().nullish()
+})),
+  "matched_cargo_types": zod.array(zod.string()),
+  "matched_routes": zod.array(zod.string()),
+  "matched_disease_models": zod.array(zod.string()),
+  "matching_arm_count": zod.number(),
+  "supporting_outcome_count": zod.number(),
+  "favorable_outcome_count": zod.number(),
+  "adverse_outcome_count": zod.number(),
+  "score": zod.number()
+})).describe('Authoritative ranked list from the database'),
+  "ai_synthesis": zod.union([zod.object({
+  "recommended_carrier": zod.string(),
+  "confidence": zod.enum(['high', 'moderate', 'low']),
+  "scientific_rationale": zod.string(),
+  "key_components": zod.array(zod.string()).optional(),
+  "advantages": zod.array(zod.string()).optional(),
+  "limitations": zod.array(zod.string()).optional()
+}),zod.null()]).describe('Secondary AI narrative grounded in the ranked carriers')
+})
+
+
+/**
+ * Paged, text-searchable list of carrier formulations
+ * @summary Browse formulations
+ */
+export const listFormulationsQueryPageDefault = 1;
+
+export const listFormulationsQueryPageSizeDefault = 50;
+export const listFormulationsQueryPageSizeMax = 200;
+
+
+
+export const ListFormulationsQueryParams = zod.object({
+  "search": zod.coerce.string().optional().describe('Case-insensitive text search across key fields'),
+  "page": zod.coerce.number().min(1).default(listFormulationsQueryPageDefault).describe('1-based page number'),
+  "page_size": zod.coerce.number().min(1).max(listFormulationsQueryPageSizeMax).default(listFormulationsQueryPageSizeDefault).describe('Number of records per page')
+})
+
+export const ListFormulationsResponse = zod.object({
+  "total": zod.number(),
+  "page": zod.number(),
+  "page_size": zod.number(),
+  "items": zod.array(zod.object({
+  "formulation_id": zod.string(),
+  "formulation_name": zod.string().nullish(),
+  "carrier_family": zod.string().nullish(),
+  "carrier_subtype": zod.string().nullish(),
+  "architecture": zod.string().nullish(),
+  "optimized_flag": zod.boolean().nullish(),
+  "intended_route": zod.string().nullish(),
+  "intended_mucosal_site": zod.string().nullish(),
+  "paper_id": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Get one formulation with all related records
+ */
+export const GetFormulationDetailParams = zod.object({
+  "formulationId": zod.coerce.string()
+})
+
+export const GetFormulationDetailResponse = zod.object({
+  "formulation_id": zod.string(),
+  "formulation_name": zod.string().nullish(),
+  "carrier_family": zod.string().nullish(),
+  "carrier_subtype": zod.string().nullish(),
+  "architecture": zod.string().nullish(),
+  "optimized_flag": zod.boolean().nullish(),
+  "intended_route": zod.string().nullish(),
+  "intended_mucosal_site": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "paper": zod.union([zod.object({
+  "paper_id": zod.string(),
+  "title": zod.string().nullish(),
+  "authors_text": zod.string().nullish(),
+  "journal": zod.string().nullish(),
+  "publication_year": zod.number().nullish(),
+  "doi": zod.string().nullish(),
+  "url": zod.string().nullish(),
+  "publication_type": zod.string().nullish()
+}),zod.null()]).optional(),
+  "materials": zod.array(zod.object({
+  "material_id": zod.string(),
+  "canonical_name": zod.string().nullish(),
+  "abbreviation": zod.string().nullish(),
+  "material_class": zod.string().nullish(),
+  "material_role": zod.string().nullish()
+})),
+  "cargos": zod.array(zod.object({
+  "cargo_id": zod.string(),
+  "canonical_name": zod.string().nullish(),
+  "cargo_type": zod.string().nullish(),
+  "cargo_role": zod.string().nullish()
+})),
+  "targeting": zod.array(zod.object({
+  "targeting_id": zod.string(),
+  "target_type": zod.string().nullish(),
+  "target_name": zod.string().nullish(),
+  "target_cell_type": zod.string().nullish(),
+  "targeting_strategy": zod.string().nullish()
+})),
+  "processes": zod.array(zod.object({
+  "process_id": zod.string(),
+  "process_stage": zod.string().nullish(),
+  "method": zod.string().nullish(),
+  "device": zod.string().nullish()
+})),
+  "physicochemical": zod.array(zod.object({
+  "measurement_id": zod.string(),
+  "metric_code": zod.string().nullish(),
+  "value_numeric": zod.number().nullish(),
+  "value_text": zod.string().nullish(),
+  "unit": zod.string().nullish()
+})),
+  "arms": zod.array(zod.object({
+  "arm_id": zod.string(),
+  "arm_name": zod.string().nullish(),
+  "administration_route": zod.string().nullish(),
+  "administration_site": zod.string().nullish(),
+  "delivery_device": zod.string().nullish(),
+  "dose_value": zod.number().nullish(),
+  "dose_unit": zod.string().nullish(),
+  "number_of_doses": zod.number().nullish(),
+  "experiment_type": zod.string().nullish(),
+  "objective": zod.string().nullish(),
+  "disease_model": zod.string().nullish(),
+  "species": zod.string().nullish(),
+  "outcomes": zod.array(zod.object({
+  "outcome_id": zod.string(),
+  "arm_id": zod.string().nullish(),
+  "outcome_domain": zod.string().nullish(),
+  "metric_code": zod.string().nullish(),
+  "target_tissue": zod.string().nullish(),
+  "value_numeric": zod.number().nullish(),
+  "value_operator": zod.string().nullish(),
+  "value_text": zod.string().nullish(),
+  "unit": zod.string().nullish(),
+  "direction_vs_comparator": zod.string().nullish(),
+  "result_polarity": zod.string().nullish(),
+  "fold_change": zod.number().nullish(),
+  "p_value": zod.number().nullish(),
+  "result_interpretation": zod.string().nullish()
+}))
+}))
+})
+
+
+/**
+ * Paged, text-searchable list of materials
+ * @summary Browse materials
+ */
+export const listMaterialsQueryPageDefault = 1;
+
+export const listMaterialsQueryPageSizeDefault = 50;
+export const listMaterialsQueryPageSizeMax = 200;
+
+
+
+export const ListMaterialsQueryParams = zod.object({
+  "search": zod.coerce.string().optional().describe('Case-insensitive text search across key fields'),
+  "page": zod.coerce.number().min(1).default(listMaterialsQueryPageDefault).describe('1-based page number'),
+  "page_size": zod.coerce.number().min(1).max(listMaterialsQueryPageSizeMax).default(listMaterialsQueryPageSizeDefault).describe('Number of records per page')
+})
+
+export const ListMaterialsResponse = zod.object({
+  "total": zod.number(),
+  "page": zod.number(),
+  "page_size": zod.number(),
+  "items": zod.array(zod.object({
+  "material_id": zod.string(),
+  "canonical_name": zod.string().nullish(),
+  "abbreviation": zod.string().nullish(),
+  "material_class": zod.string().nullish(),
+  "chemical_subclass": zod.string().nullish(),
+  "ionizable_flag": zod.boolean().nullish(),
+  "apparent_pka": zod.number().nullish(),
+  "molecular_weight_da": zod.number().nullish()
+}))
+})
+
+
+/**
+ * Paged, text-searchable list of source papers
+ * @summary Browse papers
+ */
+export const listPapersQueryPageDefault = 1;
+
+export const listPapersQueryPageSizeDefault = 50;
+export const listPapersQueryPageSizeMax = 200;
+
+
+
+export const ListPapersQueryParams = zod.object({
+  "search": zod.coerce.string().optional().describe('Case-insensitive text search across key fields'),
+  "page": zod.coerce.number().min(1).default(listPapersQueryPageDefault).describe('1-based page number'),
+  "page_size": zod.coerce.number().min(1).max(listPapersQueryPageSizeMax).default(listPapersQueryPageSizeDefault).describe('Number of records per page')
+})
+
+export const ListPapersResponse = zod.object({
+  "total": zod.number(),
+  "page": zod.number(),
+  "page_size": zod.number(),
+  "items": zod.array(zod.object({
+  "paper_id": zod.string(),
+  "title": zod.string().nullish(),
+  "authors_text": zod.string().nullish(),
+  "journal": zod.string().nullish(),
+  "publication_year": zod.number().nullish(),
+  "doi": zod.string().nullish(),
+  "url": zod.string().nullish(),
+  "publication_type": zod.string().nullish()
+}))
+})
+
+
+/**
+ * Paged, text-searchable list of biological outcomes
+ * @summary Browse biological outcomes
+ */
+export const listOutcomesQueryPageDefault = 1;
+
+export const listOutcomesQueryPageSizeDefault = 50;
+export const listOutcomesQueryPageSizeMax = 200;
+
+
+
+export const ListOutcomesQueryParams = zod.object({
+  "search": zod.coerce.string().optional().describe('Case-insensitive text search across key fields'),
+  "page": zod.coerce.number().min(1).default(listOutcomesQueryPageDefault).describe('1-based page number'),
+  "page_size": zod.coerce.number().min(1).max(listOutcomesQueryPageSizeMax).default(listOutcomesQueryPageSizeDefault).describe('Number of records per page')
+})
+
+export const ListOutcomesResponse = zod.object({
+  "total": zod.number(),
+  "page": zod.number(),
+  "page_size": zod.number(),
+  "items": zod.array(zod.object({
+  "outcome_id": zod.string(),
+  "arm_id": zod.string().nullish(),
+  "outcome_domain": zod.string().nullish(),
+  "metric_code": zod.string().nullish(),
+  "target_tissue": zod.string().nullish(),
+  "value_numeric": zod.number().nullish(),
+  "value_operator": zod.string().nullish(),
+  "value_text": zod.string().nullish(),
+  "unit": zod.string().nullish(),
+  "direction_vs_comparator": zod.string().nullish(),
+  "result_polarity": zod.string().nullish(),
+  "fold_change": zod.number().nullish(),
+  "p_value": zod.number().nullish(),
+  "result_interpretation": zod.string().nullish()
+}))
+})
+
+
+/**
+ * Returns distinct cargo types, diseases, and routes from the database
+ * @summary Get all filter option values
+ */
+export const GetFilterOptionsResponse = zod.object({
+  "cargo_types": zod.array(zod.string()),
+  "diseases": zod.array(zod.string()),
+  "routes": zod.array(zod.string())
+})
+
+
+/**
+ * Returns distinct cargo types from the database, deduplicated and alphabetized
+ * @summary Get nucleic acid / cargo types
+ */
+export const GetCargoOptionsResponse = zod.object({
+  "values": zod.array(zod.string()).describe('Distinct values from the database, alphabetically sorted')
+})
+
+
+/**
+ * Returns distinct disease models from the database, deduplicated and alphabetized
+ * @summary Get disease / disease model values
  */
 export const GetDiseaseOptionsResponse = zod.object({
   "values": zod.array(zod.string()).describe('Distinct values from the database, alphabetically sorted')
@@ -25,63 +423,16 @@ export const GetDiseaseOptionsResponse = zod.object({
 
 
 /**
- * @summary Routes of administration, optionally filtered by disease
+ * Returns distinct routes of administration from the database, deduplicated and alphabetized
+ * @summary Get routes of administration
  */
-export const GetRouteOptionsQueryParams = zod.object({
-  "disease": zod.coerce.string().optional().describe('When provided, returns only routes that have evidence for this disease model')
-})
-
 export const GetRouteOptionsResponse = zod.object({
   "values": zod.array(zod.string()).describe('Distinct values from the database, alphabetically sorted')
 })
 
 
 /**
- * @summary Formulations studied for a specific disease and route
- */
-export const GetFormulationOptionsQueryParams = zod.object({
-  "disease": zod.coerce.string(),
-  "route": zod.coerce.string()
-})
-
-export const GetFormulationOptionsResponse = zod.object({
-  "formulations": zod.array(zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "carrier_family": zod.string().nullish(),
-  "carrier_subtype": zod.string().nullish()
-}))
-})
-
-
-/**
- * @summary Full detail for one formulation — advantages, limitations, materials, papers
- */
-export const GetFormulationDetailParams = zod.object({
-  "id": zod.coerce.string()
-})
-
-export const GetFormulationDetailResponse = zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "carrier_family": zod.string().nullish(),
-  "carrier_subtype": zod.string().nullish(),
-  "description": zod.string().nullish(),
-  "materials": zod.array(zod.string()),
-  "advantages": zod.array(zod.string()).describe('Beneficial outcomes and supporting mechanisms from the database'),
-  "limitations": zod.array(zod.string()).describe('Known limitations directly from the database records'),
-  "mechanisms": zod.array(zod.string()).describe('Delivery mechanism statements from the database'),
-  "papers": zod.array(zod.object({
-  "title": zod.string().nullable(),
-  "authors": zod.string().nullish(),
-  "journal": zod.string().nullish(),
-  "year": zod.number().nullish(),
-  "doi": zod.string().nullish()
-}))
-})
-
-
-/**
+ * Returns summary statistics about the scientific literature database
  * @summary Get database statistics
  */
 export const GetDatabaseStatsResponse = zod.object({

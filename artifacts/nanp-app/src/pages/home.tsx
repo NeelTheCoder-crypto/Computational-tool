@@ -197,12 +197,85 @@ function DetailPanel({ formulationId }: { formulationId: string }) {
         </div>
       )}
 
-      {/* Experimental evidence from arms */}
+      {/* Advantages & Limitations derived from biological outcomes */}
+      {(() => {
+        const allOutcomes = data.arms.flatMap((arm) => arm.outcomes ?? []);
+        const advantages = allOutcomes.filter(
+          (o) =>
+            o.result_polarity === 'beneficial' ||
+            (o.result_polarity === 'neutral' && o.direction_vs_comparator !== 'no_change' && o.direction_vs_comparator != null)
+        );
+        const limitations = allOutcomes.filter((o) => o.result_polarity === 'adverse');
+
+        const outcomeLabel = (o: typeof allOutcomes[0]) =>
+          o.result_interpretation ??
+          [o.outcome_domain, o.metric_code, o.direction_vs_comparator]
+            .filter(Boolean)
+            .join(' · ');
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="border-emerald-200 bg-emerald-50/50 shadow-none">
+              <CardHeader className="pb-3 pt-4 px-4">
+                <CardTitle className="flex items-center gap-2 text-base text-emerald-800">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  Advantages
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                {advantages.length > 0 ? (
+                  <ul className="space-y-2.5">
+                    {advantages.map((o, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-emerald-900">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                        {outcomeLabel(o)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm font-medium text-muted-foreground">No advantages recorded</p>
+                    <p className="text-xs text-muted-foreground/70">No beneficial outcomes found in the database for this formulation.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-red-200 bg-red-50/50 shadow-none">
+              <CardHeader className="pb-3 pt-4 px-4">
+                <CardTitle className="flex items-center gap-2 text-base text-red-800">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  Limitations
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                {limitations.length > 0 ? (
+                  <ul className="space-y-2.5">
+                    {limitations.map((o, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-red-900">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+                        {outcomeLabel(o)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm font-medium text-muted-foreground">No limitations recorded</p>
+                    <p className="text-xs text-muted-foreground/70">No adverse outcomes found in the database for this formulation.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
+      {/* Experimental arms & cargo */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-emerald-200 bg-emerald-50/50 shadow-none">
+        <Card className="border-sky-200 bg-sky-50/50 shadow-none">
           <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="flex items-center gap-2 text-base text-emerald-800">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <CardTitle className="flex items-center gap-2 text-base text-sky-800">
+              <CheckCircle2 className="h-4 w-4 text-sky-600" />
               Experimental Arms
             </CardTitle>
           </CardHeader>
@@ -210,8 +283,8 @@ function DetailPanel({ formulationId }: { formulationId: string }) {
             {data.arms.length > 0 ? (
               <ul className="space-y-2.5">
                 {data.arms.map((arm, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-emerald-900">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                  <li key={i} className="flex items-start gap-2 text-sm text-sky-900">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500 mt-1.5 shrink-0" />
                     {arm.administration_route ?? 'Route unknown'}{arm.disease_model ? ` — ${arm.disease_model}` : ''}
                   </li>
                 ))}
@@ -225,10 +298,10 @@ function DetailPanel({ formulationId }: { formulationId: string }) {
           </CardContent>
         </Card>
 
-        <Card className="border-sky-200 bg-sky-50/50 shadow-none">
+        <Card className="border-violet-200 bg-violet-50/50 shadow-none">
           <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="flex items-center gap-2 text-base text-sky-800">
-              <AlertCircle className="h-4 w-4 text-sky-600" />
+            <CardTitle className="flex items-center gap-2 text-base text-violet-800">
+              <AlertCircle className="h-4 w-4 text-violet-600" />
               Cargo Types
             </CardTitle>
           </CardHeader>
@@ -236,8 +309,8 @@ function DetailPanel({ formulationId }: { formulationId: string }) {
             {data.cargos.length > 0 ? (
               <ul className="space-y-2.5">
                 {data.cargos.map((c, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-sky-900">
-                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500 mt-1.5 shrink-0" />
+                  <li key={i} className="flex items-start gap-2 text-sm text-violet-900">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-500 mt-1.5 shrink-0" />
                     {c.canonical_name ?? c.cargo_id}{c.cargo_type ? ` (${c.cargo_type})` : ''}
                   </li>
                 ))}

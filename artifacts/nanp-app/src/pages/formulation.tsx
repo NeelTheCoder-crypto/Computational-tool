@@ -146,10 +146,10 @@ export default function FormulationDetail() {
   return (
     <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
       <Link
-        href="/explore"
+        href="/"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Back
+        <ArrowLeft className="h-4 w-4" /> Back to discovery
       </Link>
 
       {isLoading && (

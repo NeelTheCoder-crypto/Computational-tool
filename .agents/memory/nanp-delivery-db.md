@@ -32,5 +32,12 @@ Stored routes: `intravenous, inhalation, nebulized_inhalation, intratracheal, in
 ## Evidence scoring
 Favorable outcome = `result_polarity === 'beneficial'` OR `direction_vs_comparator === 'improved'`. Adverse = `'adverse'`/`'reduced'`. Score = `matchingArms×10 + favorable×3 + supporting×1 − adverse×2`. For filtered queries, count outcomes on matching arms only — never fall back to unrelated arms (that would count evidence for wrong cargo/route/disease combinations).
 
+## Discovery must preserve the catalog
+Strict same-arm conjunction remains the definition of a direct multi-input match, but carrier inputs organize rather than eliminate the formulation catalog. Rank direct matches first, independently related records second, and unmatched catalog records last.
+
+**Why:** Sparse literature relationships make strict filtering return empty results for many scientifically useful input combinations. Hiding everything else prevents researchers from seeing what evidence exists and where the gaps are.
+
+**How to apply:** Label evidence tiers explicitly and report how many selected dimensions each formulation supports. Never call a partial or unfiltered result optimal, and never imply split-arm evidence is direct combined evidence.
+
 ## Pure matching logic lives in `carrierMatchingPure.ts`
 The matching functions (`matchFormulationIds`, `expandRoute`) and types (`Graph`, `GraphArm`, `CarrierFilters`) are in a Supabase-free module so unit tests can import them directly via `--experimental-strip-types`. Test file excluded from `tsconfig.json` `include` (uses `.ts` extension imports for direct node execution).

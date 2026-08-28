@@ -24,6 +24,7 @@ export * from './formulationArm';
 export * from './formulationDetail';
 export * from './formulationLimitation';
 export * from './formulationListItem';
+export * from './formulationListItemMatchTier';
 export * from './formulationListResult';
 export * from './formulationMechanism';
 export * from './formulationProcess';

@@ -36,6 +36,8 @@ import {
   Microscope,
   FileText,
   AlertTriangle,
+  CheckCircle2,
+  CircleDotDashed,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -173,6 +175,7 @@ function FormulationsTab({ search, page, setPage }: TabProps) {
   });
   const items = data?.items ?? [];
   const hasFilters = Boolean(disease || route || cargoType || material || evidence);
+  const hasCarrierInputs = Boolean(disease || route || cargoType);
 
   useEffect(() => {
     setPage(1);
@@ -223,7 +226,9 @@ function FormulationsTab({ search, page, setPage }: TabProps) {
             {isLoading ? 'Loading catalog…' : `${data?.total ?? 0} formulations`}
           </p>
           <p className="text-xs text-muted-foreground">
-            Intended routes and routes observed in experimental arms are kept distinct.
+            {hasCarrierInputs
+              ? 'Direct combined evidence ranks first; related and catalog records remain visible.'
+              : 'Intended routes and routes observed in experimental arms are kept distinct.'}
           </p>
         </div>
         {hasFilters && (
@@ -232,6 +237,17 @@ function FormulationsTab({ search, page, setPage }: TabProps) {
           </Button>
         )}
       </div>
+
+      {hasCarrierInputs && !isLoading && !isError && (
+        <div className="rounded-lg border border-primary/20 bg-primary/[0.04] p-4 text-sm text-foreground">
+          <p className="font-medium">How these results are organized</p>
+          <p className="mt-1 text-muted-foreground">
+            Direct matches have one experimental arm supporting all selected carrier inputs.
+            Related evidence supports some inputs separately. Remaining formulations stay
+            available as catalog records instead of being hidden.
+          </p>
+        </div>
+      )}
 
       {isLoading && <StateRow loading empty={false} />}
       {isError && (
@@ -263,6 +279,34 @@ function FormulationsTab({ search, page, setPage }: TabProps) {
               <CardContent className="flex h-full flex-col gap-4 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
+                    {hasCarrierInputs && (
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1',
+                            formulation.match_tier === 'direct'
+                              ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                              : formulation.match_tier === 'partial'
+                                ? 'bg-amber-50 text-amber-800 ring-amber-200'
+                                : 'bg-muted text-muted-foreground ring-border'
+                          )}
+                        >
+                          {formulation.match_tier === 'direct' ? (
+                            <CheckCircle2 className="h-3 w-3" />
+                          ) : (
+                            <CircleDotDashed className="h-3 w-3" />
+                          )}
+                          {formulation.match_tier === 'direct'
+                            ? 'Direct combined evidence'
+                            : formulation.match_tier === 'partial'
+                              ? 'Related evidence'
+                              : 'Catalog record'}
+                        </span>
+                        <span className="font-mono text-[11px] text-muted-foreground">
+                          {formulation.matched_filter_count}/{formulation.active_filter_count} inputs supported
+                        </span>
+                      </div>
+                    )}
                     <Link
                       href={`/formulation/${formulation.formulation_id}`}
                       className="font-serif text-xl font-medium text-foreground hover:text-primary"
@@ -496,7 +540,7 @@ export default function Explorer() {
   const switchTab = (key: TabKey) => {
     setSearchInput('');
     setPage(1);
-    setLocation(key === 'formulations' ? '/explore' : `/explore/${key}`);
+    setLocation(key === 'formulations' ? '/' : `/explore/${key}`);
   };
 
   const tabProps: TabProps = { search, page, setPage };
@@ -505,11 +549,11 @@ export default function Explorer() {
     <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
       <div className="space-y-2">
         <h2 className="font-serif text-3xl font-medium text-foreground">
-          Database Explorer
+          Carrier Discovery
         </h2>
         <p className="text-muted-foreground">
-          Browse the underlying records directly — every formulation, material, paper,
-          and outcome in the database.
+          Compare carrier evidence by therapeutic nucleic acid, disease, and route,
+          while keeping the complete research database accessible.
         </p>
       </div>
 

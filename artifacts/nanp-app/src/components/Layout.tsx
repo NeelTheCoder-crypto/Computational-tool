@@ -48,8 +48,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: stats } = useGetDatabaseStats();
 
-  const isExplore = location.startsWith('/explore');
-  const isFinder = location === '/' || location.startsWith('/formulation');
+  const isDatabase = location.startsWith('/explore');
+  const isDiscover = location === '/' || location.startsWith('/formulation');
 
   return (
     <div className="min-h-[100dvh] w-full flex flex-col scientific-grid">
@@ -70,11 +70,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </Link>
 
           <nav className="flex items-center gap-1 ml-2">
-            <NavLink href="/" active={isFinder} icon={Search}>
-              Finder
+            <NavLink href="/" active={isDiscover} icon={Search}>
+              Discover
             </NavLink>
-            <NavLink href="/explore" active={isExplore} icon={Layers}>
-              Explorer
+            <NavLink href="/explore/materials" active={isDatabase} icon={Layers}>
+              Database
             </NavLink>
           </nav>
 

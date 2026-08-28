@@ -602,6 +602,9 @@ components:
       type: object
       required:
         - formulation_id
+        - match_tier
+        - matched_filter_count
+        - active_filter_count
       properties:
         formulation_id:
           type: string
@@ -645,6 +648,16 @@ components:
           type: integer
         outcome_count:
           type: integer
+        match_tier:
+          type: string
+          enum: [direct, partial, catalog]
+          description: Direct same-arm match, independently related evidence, or an unmatched catalog record
+        matched_filter_count:
+          type: integer
+          description: Number of active cargo, disease, and route inputs supported by this formulation
+        active_filter_count:
+          type: integer
+          description: Number of active cargo, disease, and route inputs in the query
 
     FormulationListResult:
       type: object

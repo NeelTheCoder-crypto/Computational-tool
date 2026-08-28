@@ -473,6 +473,9 @@ export interface FormulationListItem {
   experimental_arm_count: number;
   disease_evidence_count: number;
   outcome_count: number;
+  match_tier: "direct" | "partial" | "catalog";
+  matched_filter_count: number;
+  active_filter_count: number;
 }
 
 export type FormulationEvidenceFilter =
@@ -526,13 +529,75 @@ export async function listFormulations(
 
   const graph = await loadGraph();
   const rowIds = new Set(rows.map((row) => row.formulation_id as string));
+  const activeRelationshipFilterCount = [
+    filters.cargoType,
+    filters.disease,
+    filters.route,
+  ].filter(Boolean).length;
+  const relationshipRankById = new Map<
+    string,
+    {
+      tier: "direct" | "partial" | "catalog";
+      matchedFilterCount: number;
+      score: number;
+    }
+  >();
+
   if (filters.disease || filters.route || filters.cargoType) {
-    const matched = matchFormulationIds(graph, {
+    const directMatches = matchFormulationIds(graph, {
       disease: filters.disease,
       route: filters.route,
       cargoType: filters.cargoType,
     });
-    rows = rows.filter((row) => matched.has(row.formulation_id as string));
+    const acceptedRoutes = filters.route ? expandRoute(filters.route) : null;
+
+    for (const row of rows) {
+      const id = row.formulation_id as string;
+      const arms = graph.armsByFormulation.get(id) ?? [];
+      const cargoTypes = graph.cargoTypesByFormulation.get(id) ?? new Set<string>();
+      const intendedRoute = graph.intendedRouteByFormulation.get(id) ?? null;
+      const cargoMatched = filters.cargoType
+        ? cargoTypes.has(filters.cargoType)
+        : false;
+      const diseaseMatched = filters.disease
+        ? arms.some((arm) => arm.disease_model === filters.disease)
+        : false;
+      const routeMatched = filters.route
+        ? arms.some((arm) => arm.route != null && acceptedRoutes!.has(arm.route)) ||
+          (intendedRoute != null && acceptedRoutes!.has(intendedRoute))
+        : false;
+      const matchedFilterCount = [cargoMatched, diseaseMatched, routeMatched].filter(
+        Boolean
+      ).length;
+      const direct = directMatches.has(id);
+      const tier = direct ? "direct" : matchedFilterCount > 0 ? "partial" : "catalog";
+      const outcomeCount = arms.reduce(
+        (totalOutcomes, arm) =>
+          totalOutcomes + (graph.outcomeCountsByArm.get(arm.arm_id)?.total ?? 0),
+        0
+      );
+      relationshipRankById.set(id, {
+        tier,
+        matchedFilterCount,
+        score:
+          (direct ? 10_000 : 0) +
+          matchedFilterCount * 1_000 +
+          arms.length * 10 +
+          outcomeCount,
+      });
+    }
+
+    // Carrier inputs organize the catalog rather than eliminating it. Exact
+    // same-arm evidence is first, followed by independently related evidence,
+    // then the remaining catalog records.
+    rows.sort((a, b) => {
+      const aRank = relationshipRankById.get(a.formulation_id as string);
+      const bRank = relationshipRankById.get(b.formulation_id as string);
+      return (
+        (bRank?.score ?? 0) - (aRank?.score ?? 0) ||
+        String(a.formulation_name ?? "").localeCompare(String(b.formulation_name ?? ""))
+      );
+    });
   }
 
   if (filters.material && rows.length > 0) {
@@ -608,6 +673,7 @@ export async function listFormulations(
           totalOutcomes + (graph.outcomeCountsByArm.get(arm.arm_id)?.total ?? 0),
         0
       );
+      const relationshipRank = relationshipRankById.get(id);
       return {
       formulation_id: r.formulation_id as string,
       formulation_name: (r.formulation_name ?? null) as string | null,
@@ -630,6 +696,9 @@ export async function listFormulations(
       experimental_arm_count: arms.length,
       disease_evidence_count: diseaseModels.size,
       outcome_count: outcomeCount,
+      match_tier: relationshipRank?.tier ?? "catalog",
+      matched_filter_count: relationshipRank?.matchedFilterCount ?? 0,
+      active_filter_count: activeRelationshipFilterCount,
       };
     }),
   };

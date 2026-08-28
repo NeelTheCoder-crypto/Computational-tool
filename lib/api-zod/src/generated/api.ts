@@ -200,7 +200,10 @@ export const ListFormulationsResponse = zod.object({
   "disease_models": zod.array(zod.string()).optional(),
   "experimental_arm_count": zod.number().optional(),
   "disease_evidence_count": zod.number().optional(),
-  "outcome_count": zod.number().optional()
+  "outcome_count": zod.number().optional(),
+  "match_tier": zod.enum(['direct', 'partial', 'catalog']).describe('Direct same-arm match, independently related evidence, or an unmatched catalog record'),
+  "matched_filter_count": zod.number().describe('Number of active cargo, disease, and route inputs supported by this formulation'),
+  "active_filter_count": zod.number().describe('Number of active cargo, disease, and route inputs in the query')
 }))
 })
 

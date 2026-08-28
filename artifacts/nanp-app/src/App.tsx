@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Route, Switch } from 'wouter';
 import Layout from './components/Layout';
-import Finder from './pages/finder';
 import Explorer from './pages/explorer';
 import FormulationDetail from './pages/formulation';
 import NotFound from './pages/not-found';
@@ -21,7 +20,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <Layout>
         <Switch>
-          <Route path="/" component={Finder} />
+          <Route path="/" component={Explorer} />
           <Route path="/explore" component={Explorer} />
           <Route path="/explore/:tab" component={Explorer} />
           <Route path="/formulation/:id" component={FormulationDetail} />

@@ -5,6 +5,7 @@
  * NANP Carrier Selection Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { FormulationListItemMatchTier } from './formulationListItemMatchTier';
 
 export interface FormulationListItem {
   formulation_id: string;
@@ -33,4 +34,10 @@ export interface FormulationListItem {
   experimental_arm_count?: number;
   disease_evidence_count?: number;
   outcome_count?: number;
+  /** Direct same-arm match, independently related evidence, or an unmatched catalog record */
+  match_tier: FormulationListItemMatchTier;
+  /** Number of active cargo, disease, and route inputs supported by this formulation */
+  matched_filter_count: number;
+  /** Number of active cargo, disease, and route inputs in the query */
+  active_filter_count: number;
 }

@@ -465,14 +465,36 @@ export interface FormulationListItem {
   intended_route: string | null;
   intended_mucosal_site: string | null;
   paper_id: string | null;
+  paper_title: string | null;
+  cargo_types: string[];
+  material_names: string[];
+  evidence_routes: string[];
+  disease_models: string[];
+  experimental_arm_count: number;
+  disease_evidence_count: number;
+  outcome_count: number;
+}
+
+export type FormulationEvidenceFilter =
+  | "with_arms"
+  | "with_outcomes"
+  | "disease_linked"
+  | "no_disease_link";
+
+export interface FormulationBrowseFilters {
+  disease?: string | undefined;
+  route?: string | undefined;
+  cargoType?: string | undefined;
+  material?: string | undefined;
+  evidence?: FormulationEvidenceFilter | undefined;
 }
 
 export async function listFormulations(
   search?: string,
-  pagination?: Pagination
+  pagination?: Pagination,
+  filters: FormulationBrowseFilters = {}
 ): Promise<PagedResult<FormulationListItem>> {
   const { page, pageSize } = normalizePagination(pagination);
-  const from = (page - 1) * pageSize;
   let query = supabase
     .from("formulations")
     .select(
@@ -486,15 +508,107 @@ export async function listFormulations(
       `formulation_name.ilike.${s},carrier_family.ilike.${s},carrier_subtype.ilike.${s},architecture.ilike.${s}`
     );
   }
-  const { data, count } = await query
+  const hasRelationshipFilters = Boolean(
+    filters.disease ||
+      filters.route ||
+      filters.cargoType ||
+      filters.material ||
+      filters.evidence
+  );
+
+  // Relationship filters are resolved from the same in-memory graph as carrier
+  // matching. This intentionally starts from formulations, so a route-only
+  // formulation is not lost just because its arms have no disease model.
+  const { data: allData } = await query
     .order("formulation_name", { ascending: true, nullsFirst: false })
-    .range(from, from + pageSize - 1);
+    .range(0, hasRelationshipFilters ? 9999 : 999);
+  let rows = allData ?? [];
+
+  const graph = await loadGraph();
+  const rowIds = new Set(rows.map((row) => row.formulation_id as string));
+  if (filters.disease || filters.route || filters.cargoType) {
+    const matched = matchFormulationIds(graph, {
+      disease: filters.disease,
+      route: filters.route,
+      cargoType: filters.cargoType,
+    });
+    rows = rows.filter((row) => matched.has(row.formulation_id as string));
+  }
+
+  if (filters.material && rows.length > 0) {
+    const { data: materialRows } = await supabase
+      .from("formulation_materials")
+      .select(
+        "formulation_id, materials(material_id, canonical_name, abbreviation, material_class)"
+      )
+      .in("formulation_id", [...rowIds]);
+    const needle = filters.material.trim().toLowerCase();
+    const materialFormulationIds = new Set(
+      (materialRows ?? [])
+        .filter((row) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const material = (row as any).materials;
+          return [material?.material_id, material?.canonical_name, material?.abbreviation, material?.material_class]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase() === needle);
+        })
+        .map((row) => row.formulation_id as string)
+    );
+    rows = rows.filter((row) => materialFormulationIds.has(row.formulation_id as string));
+  }
+
+  if (filters.evidence) {
+    rows = rows.filter((row) => {
+      const arms = graph.armsByFormulation.get(row.formulation_id as string) ?? [];
+      const outcomes = arms.reduce(
+        (total, arm) => total + (graph.outcomeCountsByArm.get(arm.arm_id)?.total ?? 0),
+        0
+      );
+      const diseaseArms = arms.filter((arm) => Boolean(arm.disease_model)).length;
+      switch (filters.evidence) {
+        case "with_arms":
+          return arms.length > 0;
+        case "with_outcomes":
+          return outcomes > 0;
+        case "disease_linked":
+          return diseaseArms > 0;
+        case "no_disease_link":
+          return diseaseArms === 0;
+        default:
+          return true;
+      }
+    });
+  }
+
+  const total = rows.length;
+  const start = (page - 1) * pageSize;
+  const pageRows = rows.slice(start, start + pageSize);
+  const detailsById = await hydrateFormulations(
+    pageRows.map((row) => row.formulation_id as string)
+  );
 
   return {
-    total: count ?? 0,
+    total,
     page,
     page_size: pageSize,
-    items: (data ?? []).map((r) => ({
+    items: pageRows.map((r) => {
+      const id = r.formulation_id as string;
+      const detail = detailsById.get(id);
+      const arms = graph.armsByFormulation.get(id) ?? [];
+      const evidenceRoutes = new Set(
+        arms.map((arm) => arm.route).filter((value): value is string => Boolean(value))
+      );
+      const diseaseModels = new Set(
+        arms
+          .map((arm) => arm.disease_model)
+          .filter((value): value is string => Boolean(value))
+      );
+      const outcomeCount = arms.reduce(
+        (totalOutcomes, arm) =>
+          totalOutcomes + (graph.outcomeCountsByArm.get(arm.arm_id)?.total ?? 0),
+        0
+      );
+      return {
       formulation_id: r.formulation_id as string,
       formulation_name: (r.formulation_name ?? null) as string | null,
       carrier_family: (r.carrier_family ?? null) as string | null,
@@ -504,7 +618,20 @@ export async function listFormulations(
       intended_route: (r.intended_route ?? null) as string | null,
       intended_mucosal_site: (r.intended_mucosal_site ?? null) as string | null,
       paper_id: (r.paper_id ?? null) as string | null,
-    })),
+      paper_title: detail?.paper?.title ?? null,
+      cargo_types: (detail?.cargos ?? [])
+        .map((cargo) => cargo.cargo_type)
+        .filter((value): value is string => Boolean(value)),
+      material_names: (detail?.materials ?? [])
+        .map((material) => material.canonical_name ?? material.abbreviation)
+        .filter((value): value is string => Boolean(value)),
+      evidence_routes: [...evidenceRoutes].sort(),
+      disease_models: [...diseaseModels].sort(),
+      experimental_arm_count: arms.length,
+      disease_evidence_count: diseaseModels.size,
+      outcome_count: outcomeCount,
+      };
+    }),
   };
 }
 
@@ -671,6 +798,7 @@ function mapOutcome(o: any): OutcomeListItem {
 
 export interface FormulationArmDetail {
   arm_id: string;
+  experiment_id: string | null;
   arm_name: string | null;
   administration_route: string | null;
   administration_site: string | null;
@@ -683,6 +811,30 @@ export interface FormulationArmDetail {
   disease_model: string | null;
   species: string | null;
   outcomes: OutcomeListItem[];
+}
+
+export interface FormulationMechanism {
+  mechanism_id: string;
+  experiment_id: string | null;
+  mechanism_category: string | null;
+  mechanism_statement: string | null;
+  evidence_status: string | null;
+  evidence_method: string | null;
+  biological_level: string | null;
+  source_text: string | null;
+  source_location: string | null;
+}
+
+export interface FormulationLimitation {
+  limitation_id: string;
+  experiment_id: string | null;
+  limitation_category: string | null;
+  limitation_statement: string | null;
+  scope: string | null;
+  severity: string | null;
+  author_reported: boolean | null;
+  source_text: string | null;
+  source_location: string | null;
 }
 
 export interface FormulationDetail extends HydratedFormulation {
@@ -707,6 +859,8 @@ export interface FormulationDetail extends HydratedFormulation {
     unit: string | null;
   }>;
   arms: FormulationArmDetail[];
+  mechanisms: FormulationMechanism[];
+  limitations: FormulationLimitation[];
 }
 
 export async function getFormulationDetail(
@@ -738,33 +892,87 @@ export async function getFormulationDetail(
   // Arms for this formulation are those whose formulation_cargo belongs to it.
   const fcIds = (fcRes.data ?? []).map((r) => r.formulation_cargo_id as string);
   let arms: FormulationArmDetail[] = [];
+  let mechanisms: FormulationMechanism[] = [];
+  let limitations: FormulationLimitation[] = [];
   if (fcIds.length > 0) {
     const { data: armData } = await supabase
       .from("experimental_arms")
       .select(
-        `arm_id, arm_name, administration_route, administration_site, delivery_device,
+        `arm_id, experiment_id, arm_name, administration_route, administration_site, delivery_device,
          dose_value, dose_unit, number_of_doses,
          experiments(experiment_type, objective, models(disease_model, species))`
       )
       .in("formulation_cargo_id", fcIds);
 
     const armIds = (armData ?? []).map((a) => a.arm_id as string);
+    const experimentIds = Array.from(
+      new Set(
+        (armData ?? [])
+          .map((a) => a.experiment_id as string | null)
+          .filter((value): value is string => Boolean(value))
+      )
+    );
     const outcomesByArm = new Map<string, OutcomeListItem[]>();
-    if (armIds.length > 0) {
-      const { data: outcomeData } = await supabase
-        .from("biological_outcomes")
-        .select(
-          `outcome_id, arm_id, outcome_domain, metric_code, target_tissue, value_numeric,
-           value_operator, value_text, unit, direction_vs_comparator, result_polarity,
-           fold_change, p_value, result_interpretation`
-        )
-        .in("arm_id", armIds);
+    const [outcomeRes, mechanismRes, limitationRes] = await Promise.all([
+      armIds.length > 0
+        ? supabase
+            .from("biological_outcomes")
+            .select(
+              `outcome_id, arm_id, outcome_domain, metric_code, target_tissue, value_numeric,
+               value_operator, value_text, unit, direction_vs_comparator, result_polarity,
+               fold_change, p_value, result_interpretation`
+            )
+            .in("arm_id", armIds)
+        : Promise.resolve({ data: [] }),
+      experimentIds.length > 0
+        ? supabase
+            .from("mechanisms")
+            .select(
+              `mechanism_id, experiment_id, mechanism_category, mechanism_statement,
+               evidence_status, evidence_method, biological_level, source_text, source_location`
+            )
+            .in("experiment_id", experimentIds)
+        : Promise.resolve({ data: [] }),
+      experimentIds.length > 0
+        ? supabase
+            .from("limitations")
+            .select(
+              `limitation_id, experiment_id, limitation_category, limitation_statement,
+               scope, severity, author_reported, source_text, source_location`
+            )
+            .in("experiment_id", experimentIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+    {
+      const outcomeData = outcomeRes.data;
       for (const o of outcomeData ?? []) {
         const armId = o.arm_id as string;
         if (!outcomesByArm.has(armId)) outcomesByArm.set(armId, []);
         outcomesByArm.get(armId)!.push(mapOutcome(o));
       }
     }
+    mechanisms = (mechanismRes.data ?? []).map((m) => ({
+      mechanism_id: m.mechanism_id as string,
+      experiment_id: (m.experiment_id ?? null) as string | null,
+      mechanism_category: (m.mechanism_category ?? null) as string | null,
+      mechanism_statement: (m.mechanism_statement ?? null) as string | null,
+      evidence_status: (m.evidence_status ?? null) as string | null,
+      evidence_method: (m.evidence_method ?? null) as string | null,
+      biological_level: (m.biological_level ?? null) as string | null,
+      source_text: (m.source_text ?? null) as string | null,
+      source_location: (m.source_location ?? null) as string | null,
+    }));
+    limitations = (limitationRes.data ?? []).map((l) => ({
+      limitation_id: l.limitation_id as string,
+      experiment_id: (l.experiment_id ?? null) as string | null,
+      limitation_category: (l.limitation_category ?? null) as string | null,
+      limitation_statement: (l.limitation_statement ?? null) as string | null,
+      scope: (l.scope ?? null) as string | null,
+      severity: (l.severity ?? null) as string | null,
+      author_reported: (l.author_reported ?? null) as boolean | null,
+      source_text: (l.source_text ?? null) as string | null,
+      source_location: (l.source_location ?? null) as string | null,
+    }));
 
     arms = (armData ?? []).map((a) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -772,6 +980,7 @@ export async function getFormulationDetail(
       const model = exp?.models;
       return {
         arm_id: a.arm_id as string,
+        experiment_id: (a.experiment_id ?? null) as string | null,
         arm_name: (a.arm_name ?? null) as string | null,
         administration_route: (a.administration_route ?? null) as string | null,
         administration_site: (a.administration_site ?? null) as string | null,
@@ -811,6 +1020,8 @@ export async function getFormulationDetail(
       unit: (m.unit ?? null) as string | null,
     })),
     arms,
+    mechanisms,
+    limitations,
   };
 }
 

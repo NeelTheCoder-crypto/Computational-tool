@@ -24,4 +24,13 @@ export interface FormulationListItem {
   intended_mucosal_site?: string | null;
   /** @nullable */
   paper_id?: string | null;
+  /** @nullable */
+  paper_title?: string | null;
+  cargo_types?: string[];
+  material_names?: string[];
+  evidence_routes?: string[];
+  disease_models?: string[];
+  experimental_arm_count?: number;
+  disease_evidence_count?: number;
+  outcome_count?: number;
 }

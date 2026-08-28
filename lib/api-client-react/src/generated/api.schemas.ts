@@ -183,6 +183,15 @@ export interface FormulationListItem {
   intended_mucosal_site?: string | null;
   /** @nullable */
   paper_id?: string | null;
+  /** @nullable */
+  paper_title?: string | null;
+  cargo_types?: string[];
+  material_names?: string[];
+  evidence_routes?: string[];
+  disease_models?: string[];
+  experimental_arm_count?: number;
+  disease_evidence_count?: number;
+  outcome_count?: number;
 }
 
 export interface FormulationListResult {
@@ -259,6 +268,8 @@ export interface Outcome {
 export interface FormulationArm {
   arm_id: string;
   /** @nullable */
+  experiment_id?: string | null;
+  /** @nullable */
   arm_name?: string | null;
   /** @nullable */
   administration_route?: string | null;
@@ -281,6 +292,46 @@ export interface FormulationArm {
   /** @nullable */
   species?: string | null;
   outcomes: Outcome[];
+}
+
+export interface FormulationMechanism {
+  mechanism_id: string;
+  /** @nullable */
+  experiment_id?: string | null;
+  /** @nullable */
+  mechanism_category?: string | null;
+  /** @nullable */
+  mechanism_statement?: string | null;
+  /** @nullable */
+  evidence_status?: string | null;
+  /** @nullable */
+  evidence_method?: string | null;
+  /** @nullable */
+  biological_level?: string | null;
+  /** @nullable */
+  source_text?: string | null;
+  /** @nullable */
+  source_location?: string | null;
+}
+
+export interface FormulationLimitation {
+  limitation_id: string;
+  /** @nullable */
+  experiment_id?: string | null;
+  /** @nullable */
+  limitation_category?: string | null;
+  /** @nullable */
+  limitation_statement?: string | null;
+  /** @nullable */
+  scope?: string | null;
+  /** @nullable */
+  severity?: string | null;
+  /** @nullable */
+  author_reported?: boolean | null;
+  /** @nullable */
+  source_text?: string | null;
+  /** @nullable */
+  source_location?: string | null;
 }
 
 export interface FormulationDetail {
@@ -308,6 +359,8 @@ export interface FormulationDetail {
   processes: FormulationProcess[];
   physicochemical: PhysicochemicalMeasurement[];
   arms: FormulationArm[];
+  mechanisms: FormulationMechanism[];
+  limitations: FormulationLimitation[];
 }
 
 export interface OutcomeListResult {
@@ -383,6 +436,36 @@ export type PageParameter = number;
  */
 export type PageSizeParameter = number;
 
+/**
+ * Include formulations with an experimental arm linked to this disease model
+ */
+export type DiseaseFilterParameter = string;
+
+/**
+ * Include formulations using this arm route or recorded intended route
+ */
+export type RouteFilterParameter = string;
+
+/**
+ * Include formulations linked to this cargo type
+ */
+export type CargoFilterParameter = string;
+
+/**
+ * Exact material name, abbreviation, class, or ID
+ */
+export type MaterialFilterParameter = string;
+
+export type EvidenceFilterParameter = typeof EvidenceFilterParameter[keyof typeof EvidenceFilterParameter];
+
+
+export const EvidenceFilterParameter = {
+  with_arms: 'with_arms',
+  with_outcomes: 'with_outcomes',
+  disease_linked: 'disease_linked',
+  no_disease_link: 'no_disease_link',
+} as const;
+
 export type ListFormulationsParams = {
 /**
  * Case-insensitive text search across key fields
@@ -399,6 +482,26 @@ page?: PageParameter;
  * @maximum 200
  */
 page_size?: PageSizeParameter;
+/**
+ * Include formulations with an experimental arm linked to this disease model
+ */
+disease?: DiseaseFilterParameter;
+/**
+ * Include formulations using this arm route or recorded intended route
+ */
+route?: RouteFilterParameter;
+/**
+ * Include formulations linked to this cargo type
+ */
+cargo_type?: CargoFilterParameter;
+/**
+ * Exact material name, abbreviation, class, or ID
+ */
+material?: MaterialFilterParameter;
+/**
+ * Filter by the type of evidence recorded for a formulation
+ */
+evidence?: EvidenceFilterParameter;
 };
 
 export type ListMaterialsParams = {
@@ -453,5 +556,12 @@ page?: PageParameter;
  * @maximum 200
  */
 page_size?: PageSizeParameter;
+};
+
+export type GetRouteOptionsParams = {
+/**
+ * Filter to routes that have evidence for this disease model
+ */
+disease?: string;
 };
 

@@ -5,8 +5,13 @@
  * NANP Carrier Selection Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { CargoFilterParameter } from './cargoFilterParameter';
+import type { DiseaseFilterParameter } from './diseaseFilterParameter';
+import type { EvidenceFilterParameter } from './evidenceFilterParameter';
+import type { MaterialFilterParameter } from './materialFilterParameter';
 import type { PageParameter } from './pageParameter';
 import type { PageSizeParameter } from './pageSizeParameter';
+import type { RouteFilterParameter } from './routeFilterParameter';
 import type { SearchParameter } from './searchParameter';
 
 export type ListFormulationsParams = {
@@ -25,4 +30,24 @@ page?: PageParameter;
  * @maximum 200
  */
 page_size?: PageSizeParameter;
+/**
+ * Include formulations with an experimental arm linked to this disease model
+ */
+disease?: DiseaseFilterParameter;
+/**
+ * Include formulations using this arm route or recorded intended route
+ */
+route?: RouteFilterParameter;
+/**
+ * Include formulations linked to this cargo type
+ */
+cargo_type?: CargoFilterParameter;
+/**
+ * Exact material name, abbreviation, class, or ID
+ */
+material?: MaterialFilterParameter;
+/**
+ * Filter by the type of evidence recorded for a formulation
+ */
+evidence?: EvidenceFilterParameter;
 };

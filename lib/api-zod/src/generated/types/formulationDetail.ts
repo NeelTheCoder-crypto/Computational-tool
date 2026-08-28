@@ -8,6 +8,8 @@
 import type { CarrierCargo } from './carrierCargo';
 import type { CarrierMaterial } from './carrierMaterial';
 import type { FormulationArm } from './formulationArm';
+import type { FormulationLimitation } from './formulationLimitation';
+import type { FormulationMechanism } from './formulationMechanism';
 import type { FormulationProcess } from './formulationProcess';
 import type { FormulationTargeting } from './formulationTargeting';
 import type { PaperSummary } from './paperSummary';
@@ -38,4 +40,6 @@ export interface FormulationDetail {
   processes: FormulationProcess[];
   physicochemical: PhysicochemicalMeasurement[];
   arms: FormulationArm[];
+  mechanisms: FormulationMechanism[];
+  limitations: FormulationLimitation[];
 }

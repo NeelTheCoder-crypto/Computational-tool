@@ -17,6 +17,9 @@ import {
   AlertTriangle,
   MinusCircle,
   AlertCircle,
+  Lightbulb,
+  ShieldAlert,
+  Route,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -143,7 +146,7 @@ export default function FormulationDetail() {
   return (
     <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
       <Link
-        href="/"
+        href="/explore"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" /> Back
@@ -198,6 +201,111 @@ export default function FormulationDetail() {
                 {data.description}
               </p>
             )}
+          </div>
+
+          <Section icon={Route} title="Disease and route connections">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Disease models from experimental arms
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {Array.from(new Set(data.arms.map((arm) => arm.disease_model).filter(Boolean))).length > 0 ? (
+                    Array.from(new Set(data.arms.map((arm) => arm.disease_model).filter(Boolean))).map((value) => (
+                      <Badge key={value} variant="secondary" className="font-mono text-[11px]">{value}</Badge>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No disease-linked experimental evidence is recorded.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Route coverage
+                </p>
+                <p className="mt-2 text-sm">
+                  <span className="text-muted-foreground">Intended route:</span>{' '}
+                  {data.intended_route ?? 'not recorded'}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {Array.from(new Set(data.arms.map((arm) => arm.administration_route).filter(Boolean))).length > 0 ? (
+                    Array.from(new Set(data.arms.map((arm) => arm.administration_route).filter(Boolean))).map((value) => (
+                      <Badge key={value} variant="outline" className="font-mono text-[11px]">{value}</Badge>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No arm-level routes are recorded.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Section>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Card className="border-emerald-200 bg-emerald-50/50 shadow-none">
+              <CardContent className="space-y-3 p-5">
+                <h3 className="flex items-center gap-2 font-medium text-emerald-900">
+                  <Lightbulb className="h-4 w-4" /> Recorded mechanisms and favorable outcomes
+                </h3>
+                {data.mechanisms.length === 0 &&
+                data.arms.flatMap((arm) => arm.outcomes).filter((outcome) => outcome.result_polarity === 'beneficial').length === 0 ? (
+                  <p className="text-sm text-emerald-900/70">No mechanism or favorable outcome records are linked to this formulation.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.mechanisms.map((mechanism) => (
+                      <div key={mechanism.mechanism_id} className="rounded-md bg-white/60 p-3 text-sm text-emerald-950">
+                        <p>{mechanism.mechanism_statement ?? mechanism.source_text ?? 'Recorded mechanism'}</p>
+                        <p className="mt-1 font-mono text-[10px] text-emerald-800/70">
+                          {[mechanism.mechanism_category, mechanism.evidence_status, mechanism.evidence_method, mechanism.experiment_id ? `experiment ${mechanism.experiment_id.slice(0, 8)}` : null]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      </div>
+                    ))}
+                    {data.arms.flatMap((arm) =>
+                      arm.outcomes
+                        .filter((outcome) => outcome.result_polarity === 'beneficial')
+                        .map((outcome) => (
+                          <OutcomeRow key={outcome.outcome_id} outcome={outcome} />
+                        ))
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-rose-200 bg-rose-50/50 shadow-none">
+              <CardContent className="space-y-3 p-5">
+                <h3 className="flex items-center gap-2 font-medium text-rose-900">
+                  <ShieldAlert className="h-4 w-4" /> Reported limitations and adverse outcomes
+                </h3>
+                {data.limitations.length === 0 &&
+                data.arms.flatMap((arm) => arm.outcomes).filter((outcome) => outcome.result_polarity === 'adverse').length === 0 ? (
+                  <p className="text-sm text-rose-900/70">No limitation or adverse outcome records are linked to this formulation.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.limitations.map((limitation) => (
+                      <div key={limitation.limitation_id} className="rounded-md bg-white/60 p-3 text-sm text-rose-950">
+                        <p>{limitation.limitation_statement ?? limitation.source_text ?? 'Recorded limitation'}</p>
+                        <p className="mt-1 font-mono text-[10px] text-rose-800/70">
+                          {[limitation.limitation_category, limitation.severity, limitation.author_reported ? 'author reported' : null, limitation.experiment_id ? `experiment ${limitation.experiment_id.slice(0, 8)}` : null]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      </div>
+                    ))}
+                    {data.arms.flatMap((arm) =>
+                      arm.outcomes
+                        .filter((outcome) => outcome.result_polarity === 'adverse')
+                        .map((outcome) => (
+                          <OutcomeRow key={outcome.outcome_id} outcome={outcome} />
+                        ))
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Paper */}

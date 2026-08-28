@@ -111,6 +111,11 @@ paths:
         - $ref: "#/components/parameters/Search"
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/DiseaseFilter"
+        - $ref: "#/components/parameters/RouteFilter"
+        - $ref: "#/components/parameters/CargoFilter"
+        - $ref: "#/components/parameters/MaterialFilter"
+        - $ref: "#/components/parameters/EvidenceFilter"
       responses:
         "200":
           description: Paged formulations
@@ -303,6 +308,42 @@ components:
         maximum: 200
         default: 50
       description: Number of records per page
+    DiseaseFilter:
+      name: disease
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Include formulations with an experimental arm linked to this disease model
+    RouteFilter:
+      name: route
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Include formulations using this arm route or recorded intended route
+    CargoFilter:
+      name: cargo_type
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Include formulations linked to this cargo type
+    MaterialFilter:
+      name: material
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Exact material name, abbreviation, class, or ID
+    EvidenceFilter:
+      name: evidence
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [with_arms, with_outcomes, disease_linked, no_disease_link]
+      description: Filter by the type of evidence recorded for a formulation
 
   schemas:
     HealthStatus:
@@ -580,6 +621,30 @@ components:
           type: ["string", "null"]
         paper_id:
           type: ["string", "null"]
+        paper_title:
+          type: ["string", "null"]
+        cargo_types:
+          type: array
+          items:
+            type: string
+        material_names:
+          type: array
+          items:
+            type: string
+        evidence_routes:
+          type: array
+          items:
+            type: string
+        disease_models:
+          type: array
+          items:
+            type: string
+        experimental_arm_count:
+          type: integer
+        disease_evidence_count:
+          type: integer
+        outcome_count:
+          type: integer
 
     FormulationListResult:
       type: object
@@ -610,6 +675,8 @@ components:
         - processes
         - physicochemical
         - arms
+        - mechanisms
+        - limitations
       properties:
         formulation_id:
           type: string
@@ -657,6 +724,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FormulationArm"
+        mechanisms:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormulationMechanism"
+        limitations:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormulationLimitation"
 
     FormulationTargeting:
       type: object
@@ -712,6 +787,8 @@ components:
       properties:
         arm_id:
           type: string
+        experiment_id:
+          type: ["string", "null"]
         arm_name:
           type: ["string", "null"]
         administration_route:
@@ -738,6 +815,54 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Outcome"
+
+    FormulationMechanism:
+      type: object
+      required:
+        - mechanism_id
+      properties:
+        mechanism_id:
+          type: string
+        experiment_id:
+          type: ["string", "null"]
+        mechanism_category:
+          type: ["string", "null"]
+        mechanism_statement:
+          type: ["string", "null"]
+        evidence_status:
+          type: ["string", "null"]
+        evidence_method:
+          type: ["string", "null"]
+        biological_level:
+          type: ["string", "null"]
+        source_text:
+          type: ["string", "null"]
+        source_location:
+          type: ["string", "null"]
+
+    FormulationLimitation:
+      type: object
+      required:
+        - limitation_id
+      properties:
+        limitation_id:
+          type: string
+        experiment_id:
+          type: ["string", "null"]
+        limitation_category:
+          type: ["string", "null"]
+        limitation_statement:
+          type: ["string", "null"]
+        scope:
+          type: ["string", "null"]
+        severity:
+          type: ["string", "null"]
+        author_reported:
+          type: ["boolean", "null"]
+        source_text:
+          type: ["string", "null"]
+        source_location:
+          type: ["string", "null"]
 
     Outcome:
       type: object

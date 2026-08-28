@@ -10,6 +10,8 @@ import type { Outcome } from './outcome';
 export interface FormulationArm {
   arm_id: string;
   /** @nullable */
+  experiment_id?: string | null;
+  /** @nullable */
   arm_name?: string | null;
   /** @nullable */
   administration_route?: string | null;

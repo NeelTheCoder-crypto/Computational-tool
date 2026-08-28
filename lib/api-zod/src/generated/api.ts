@@ -171,7 +171,12 @@ export const listFormulationsQueryPageSizeMax = 200;
 export const ListFormulationsQueryParams = zod.object({
   "search": zod.coerce.string().optional().describe('Case-insensitive text search across key fields'),
   "page": zod.coerce.number().min(1).default(listFormulationsQueryPageDefault).describe('1-based page number'),
-  "page_size": zod.coerce.number().min(1).max(listFormulationsQueryPageSizeMax).default(listFormulationsQueryPageSizeDefault).describe('Number of records per page')
+  "page_size": zod.coerce.number().min(1).max(listFormulationsQueryPageSizeMax).default(listFormulationsQueryPageSizeDefault).describe('Number of records per page'),
+  "disease": zod.coerce.string().optional().describe('Include formulations with an experimental arm linked to this disease model'),
+  "route": zod.coerce.string().optional().describe('Include formulations using this arm route or recorded intended route'),
+  "cargo_type": zod.coerce.string().optional().describe('Include formulations linked to this cargo type'),
+  "material": zod.coerce.string().optional().describe('Exact material name, abbreviation, class, or ID'),
+  "evidence": zod.enum(['with_arms', 'with_outcomes', 'disease_linked', 'no_disease_link']).optional().describe('Filter by the type of evidence recorded for a formulation')
 })
 
 export const ListFormulationsResponse = zod.object({
@@ -187,7 +192,15 @@ export const ListFormulationsResponse = zod.object({
   "optimized_flag": zod.boolean().nullish(),
   "intended_route": zod.string().nullish(),
   "intended_mucosal_site": zod.string().nullish(),
-  "paper_id": zod.string().nullish()
+  "paper_id": zod.string().nullish(),
+  "paper_title": zod.string().nullish(),
+  "cargo_types": zod.array(zod.string()).optional(),
+  "material_names": zod.array(zod.string()).optional(),
+  "evidence_routes": zod.array(zod.string()).optional(),
+  "disease_models": zod.array(zod.string()).optional(),
+  "experimental_arm_count": zod.number().optional(),
+  "disease_evidence_count": zod.number().optional(),
+  "outcome_count": zod.number().optional()
 }))
 })
 
@@ -254,6 +267,7 @@ export const GetFormulationDetailResponse = zod.object({
 })),
   "arms": zod.array(zod.object({
   "arm_id": zod.string(),
+  "experiment_id": zod.string().nullish(),
   "arm_name": zod.string().nullish(),
   "administration_route": zod.string().nullish(),
   "administration_site": zod.string().nullish(),
@@ -281,6 +295,28 @@ export const GetFormulationDetailResponse = zod.object({
   "p_value": zod.number().nullish(),
   "result_interpretation": zod.string().nullish()
 }))
+})),
+  "mechanisms": zod.array(zod.object({
+  "mechanism_id": zod.string(),
+  "experiment_id": zod.string().nullish(),
+  "mechanism_category": zod.string().nullish(),
+  "mechanism_statement": zod.string().nullish(),
+  "evidence_status": zod.string().nullish(),
+  "evidence_method": zod.string().nullish(),
+  "biological_level": zod.string().nullish(),
+  "source_text": zod.string().nullish(),
+  "source_location": zod.string().nullish()
+})),
+  "limitations": zod.array(zod.object({
+  "limitation_id": zod.string(),
+  "experiment_id": zod.string().nullish(),
+  "limitation_category": zod.string().nullish(),
+  "limitation_statement": zod.string().nullish(),
+  "scope": zod.string().nullish(),
+  "severity": zod.string().nullish(),
+  "author_reported": zod.boolean().nullish(),
+  "source_text": zod.string().nullish(),
+  "source_location": zod.string().nullish()
 }))
 })
 
@@ -423,9 +459,13 @@ export const GetDiseaseOptionsResponse = zod.object({
 
 
 /**
- * Returns distinct routes of administration from the database, deduplicated and alphabetized
+ * Returns distinct routes of administration from the database, deduplicated and alphabetized. When `disease` is provided, only routes that have ≥1 matching formulation for that disease are returned.
  * @summary Get routes of administration
  */
+export const GetRouteOptionsQueryParams = zod.object({
+  "disease": zod.coerce.string().optional().describe('Filter to routes that have evidence for this disease model')
+})
+
 export const GetRouteOptionsResponse = zod.object({
   "values": zod.array(zod.string()).describe('Distinct values from the database, alphabetically sorted')
 })

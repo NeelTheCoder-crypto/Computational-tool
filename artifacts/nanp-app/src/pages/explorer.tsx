@@ -5,6 +5,7 @@ import {
   useListMaterials,
   useListPapers,
   useListOutcomes,
+  useGetFilterOptions,
 } from '@workspace/api-client-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +30,12 @@ import {
   Activity,
   Inbox,
   ArrowRight,
+  RotateCcw,
+  Route,
+  Dna,
+  Microscope,
+  FileText,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -117,53 +124,212 @@ function StateRow({ loading, empty }: { loading: boolean; empty: boolean }) {
   return null;
 }
 
-function FormulationsTab({ search, page, setPage }: TabProps) {
-  const { data, isLoading } = useListFormulations({ search: search || undefined, page, page_size: PAGE_SIZE });
-  const items = data?.items ?? [];
+type EvidenceFilter = '' | 'with_arms' | 'with_outcomes' | 'disease_linked' | 'no_disease_link';
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}) {
   return (
-    <>
-      {isLoading || items.length === 0 ? (
-        <StateRow loading={isLoading} empty={items.length === 0} />
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Family</TableHead>
-              <TableHead>Subtype</TableHead>
-              <TableHead>Route</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((f) => (
-              <TableRow key={f.formulation_id} className="group">
-                <TableCell className="font-medium">
-                  <Link href={`/formulation/${f.formulation_id}`} className="hover:text-primary hover:underline">
-                    {f.formulation_name ?? f.formulation_id.slice(0, 8)}
+    <label className="space-y-1.5">
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none ring-offset-background focus:ring-2 focus:ring-ring"
+      >
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function FormulationsTab({ search, page, setPage }: TabProps) {
+  const [disease, setDisease] = useState('');
+  const [route, setRoute] = useState('');
+  const [cargoType, setCargoType] = useState('');
+  const [material, setMaterial] = useState('');
+  const [evidence, setEvidence] = useState<EvidenceFilter>('');
+  const { data: options } = useGetFilterOptions();
+  const { data: materials } = useListMaterials({ page_size: 200 });
+  const { data, isLoading, isError } = useListFormulations({
+    search: search || undefined,
+    page,
+    page_size: PAGE_SIZE,
+    disease: disease || undefined,
+    route: route || undefined,
+    cargo_type: cargoType || undefined,
+    material: material || undefined,
+    evidence: evidence || undefined,
+  });
+  const items = data?.items ?? [];
+  const hasFilters = Boolean(disease || route || cargoType || material || evidence);
+
+  useEffect(() => {
+    setPage(1);
+  }, [disease, route, cargoType, material, evidence, setPage]);
+
+  const resetFilters = () => {
+    setDisease('');
+    setRoute('');
+    setCargoType('');
+    setMaterial('');
+    setEvidence('');
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-3 rounded-lg border border-border/60 bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-5">
+        <FilterSelect label="Disease" value={disease} onChange={setDisease}>
+          <option value="">Any disease</option>
+          {(options?.diseases ?? []).map((value) => <option key={value}>{value}</option>)}
+        </FilterSelect>
+        <FilterSelect label="Route" value={route} onChange={setRoute}>
+          <option value="">Any route</option>
+          {(options?.routes ?? []).map((value) => <option key={value}>{value}</option>)}
+        </FilterSelect>
+        <FilterSelect label="Cargo" value={cargoType} onChange={setCargoType}>
+          <option value="">Any cargo</option>
+          {(options?.cargo_types ?? []).map((value) => <option key={value}>{value}</option>)}
+        </FilterSelect>
+        <FilterSelect label="Material" value={material} onChange={setMaterial}>
+          <option value="">Any material</option>
+          {(materials?.items ?? []).map((item) => {
+            const value = item.canonical_name ?? item.abbreviation ?? item.material_id;
+            return <option key={item.material_id} value={value}>{value}</option>;
+          })}
+        </FilterSelect>
+        <FilterSelect label="Evidence" value={evidence} onChange={(value) => setEvidence(value as EvidenceFilter)}>
+          <option value="">Any evidence</option>
+          <option value="with_arms">Experimental arms</option>
+          <option value="with_outcomes">Biological outcomes</option>
+          <option value="disease_linked">Disease-linked evidence</option>
+          <option value="no_disease_link">No disease link recorded</option>
+        </FilterSelect>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            {isLoading ? 'Loading catalog…' : `${data?.total ?? 0} formulations`}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Intended routes and routes observed in experimental arms are kept distinct.
+          </p>
+        </div>
+        {hasFilters && (
+          <Button variant="outline" size="sm" onClick={resetFilters}>
+            <RotateCcw className="h-4 w-4" /> Clear filters
+          </Button>
+        )}
+      </div>
+
+      {isLoading && <StateRow loading empty={false} />}
+      {isError && (
+        <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          The formulation catalog could not be loaded from the database.
+        </div>
+      )}
+      {!isLoading && !isError && items.length === 0 && (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-12 text-center">
+          <Inbox className="h-9 w-9 text-muted-foreground/40" />
+          <div>
+            <p className="font-medium text-foreground">
+              {disease ? 'No direct disease-linked formulations are recorded' : 'No formulations match these filters'}
+            </p>
+            <p className="mx-auto mt-1 max-w-lg text-sm text-muted-foreground">
+              {disease
+                ? `The catalog contains formulations, but none have an experimental arm connected to “${disease}” under the other active filters.`
+                : 'Broaden the relationship filters or return to the complete catalog.'}
+            </p>
+          </div>
+          <Button onClick={resetFilters}>Browse the complete catalog</Button>
+        </div>
+      )}
+      {!isLoading && !isError && items.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {items.map((formulation) => (
+            <Card key={formulation.formulation_id} className="border-border/60 shadow-none">
+              <CardContent className="flex h-full flex-col gap-4 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/formulation/${formulation.formulation_id}`}
+                      className="font-serif text-xl font-medium text-foreground hover:text-primary"
+                    >
+                      {formulation.formulation_name ?? formulation.formulation_id.slice(0, 8)}
+                    </Link>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {[formulation.carrier_family, formulation.carrier_subtype, formulation.architecture]
+                        .filter(Boolean)
+                        .join(' · ') || 'Formulation record'}
+                    </p>
+                  </div>
+                  <Link href={`/formulation/${formulation.formulation_id}`} aria-label="Open formulation detail">
+                    <ArrowRight className="h-5 w-5 text-muted-foreground" />
                   </Link>
-                </TableCell>
-                <TableCell>
-                  {f.carrier_family && (
-                    <Badge variant="secondary" className="font-mono text-[11px]">{f.carrier_family}</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-sm">{f.carrier_subtype ?? '—'}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {f.intended_route ?? f.intended_mucosal_site ?? '—'}
-                </TableCell>
-                <TableCell>
-                  <Link href={`/formulation/${f.formulation_id}`}>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                  </Link>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    ['arms', formulation.experimental_arm_count ?? 0],
+                    ['diseases', formulation.disease_evidence_count ?? 0],
+                    ['outcomes', formulation.outcome_count ?? 0],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md bg-muted/40 p-2.5">
+                      <p className="font-mono text-lg font-semibold">{value}</p>
+                      <p className="text-[11px] text-muted-foreground">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-start gap-2">
+                    <Route className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span><strong>Intended:</strong> {formulation.intended_route ?? 'not recorded'}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Microscope className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span><strong>Arm routes:</strong> {(formulation.evidence_routes ?? []).join(', ') || 'none recorded'}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Dna className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span><strong>Cargo:</strong> {(formulation.cargo_types ?? []).join(', ') || 'not recorded'}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {(formulation.disease_models ?? []).slice(0, 3).map((value) => (
+                    <Badge key={`disease-${value}`} variant="secondary" className="font-mono text-[10px]">{value}</Badge>
+                  ))}
+                  {(formulation.material_names ?? []).slice(0, 3).map((value) => (
+                    <Badge key={`material-${value}`} variant="outline" className="font-mono text-[10px]">{value}</Badge>
+                  ))}
+                </div>
+
+                {formulation.paper_title && (
+                  <p className="mt-auto flex items-start gap-2 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+                    <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span className="line-clamp-2">{formulation.paper_title}</span>
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
       <Pager page={page} pageSize={PAGE_SIZE} total={data?.total ?? 0} onPage={setPage} />
-    </>
+    </div>
   );
 }
 

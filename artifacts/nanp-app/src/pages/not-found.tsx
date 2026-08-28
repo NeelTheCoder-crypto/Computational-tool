@@ -1,20 +1,24 @@
+import { Link } from 'wouter';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md mx-4">
+    <div className="flex min-h-[60vh] w-full items-center justify-center px-6">
+      <Card className="w-full max-w-md">
         <CardContent className="pt-6">
-          <div className="flex mb-4 gap-2">
-            <AlertCircle className="h-8 w-8 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900">
-              404 Page Not Found
+          <div className="mb-4 flex gap-2">
+            <AlertCircle className="h-7 w-7 text-destructive" />
+            <h1 className="font-serif text-2xl font-semibold text-foreground">
+              Page not found
             </h1>
           </div>
-
-          <p className="mt-4 text-sm text-gray-600">
-            Did you forget to add the page to the router?
+          <p className="text-sm text-muted-foreground">
+            That page doesn’t exist.{' '}
+            <Link href="/" className="text-primary hover:underline">
+              Return to the Carrier Finder
+            </Link>
+            .
           </p>
         </CardContent>
       </Card>

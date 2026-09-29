@@ -50,3 +50,6 @@ export * from './recommendationInput';
 export * from './recommendationResult';
 export * from './routeFilterParameter';
 export * from './searchParameter';
+export * from './sheetCatalog';
+export * from './sheetCatalogOptions';
+export * from './sheetRecord';

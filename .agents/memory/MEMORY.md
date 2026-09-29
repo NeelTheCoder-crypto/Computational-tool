@@ -1,3 +1,4 @@
 - [NANP delivery DB](nanp-delivery-db.md) — Supabase schema quirks: UUID string PKs, arm-as-join-nexus for cargo/route/disease, route umbrella rule.
 - [Limitations/mechanisms join via experiment_id](limitations-experiment-join.md) — DB stores these at experiment level, not per-formulation; must join via experiment_id.
 - [api-client-react stale dist](api-client-stale-dist.md) — artifacts typecheck against the package's emitted dist/*.d.ts; run `pnpm run typecheck:libs` after regenerating the client.
+- [Carrier-sheet evidence policy](sheet-evidence-policy.md) — literal row-text matches only; label partial gaps and avoid inferred suitability or clinical claims.

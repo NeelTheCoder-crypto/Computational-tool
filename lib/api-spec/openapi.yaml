@@ -21,6 +21,24 @@ tags:
   - name: stats
     description: Database statistics
 paths:
+  /sheet:
+    get:
+      operationId: getSheetCatalog
+      tags: [carriers]
+      summary: Read carrier records and options from the Google Sheet
+      responses:
+        "200":
+          description: Current public sheet records and literal option labels
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SheetCatalog"
+        "503":
+          description: Google Sheet unavailable or changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
   /healthz:
     get:
       operationId: healthCheck
@@ -346,6 +364,41 @@ components:
       description: Filter by the type of evidence recorded for a formulation
 
   schemas:
+    SheetRecord:
+      type: object
+      required: [row, particle_type, reference, composition, mechanism, advantages, limitations, methodology, formulation_name, diseases, routes, cargos, is_review, source_url]
+      properties:
+        row: { type: integer }
+        particle_type: { type: string }
+        reference: { type: string }
+        composition: { type: string }
+        mechanism: { type: string }
+        advantages: { type: string }
+        limitations: { type: string }
+        methodology: { type: string }
+        formulation_name: { type: ["string", "null"] }
+        diseases: { type: array, items: { type: string } }
+        routes: { type: array, items: { type: string } }
+        cargos: { type: array, items: { type: string } }
+        is_review: { type: boolean }
+        source_url: { type: string }
+    SheetCatalog:
+      type: object
+      required: [records, options, updated_at, sheet_url]
+      properties:
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/SheetRecord"
+        options:
+          type: object
+          required: [diseases, routes, cargos]
+          properties:
+            diseases: { type: array, items: { type: string } }
+            routes: { type: array, items: { type: string } }
+            cargos: { type: array, items: { type: string } }
+        updated_at: { type: string }
+        sheet_url: { type: string }
     HealthStatus:
       type: object
       properties:

@@ -9,6 +9,36 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Read carrier records and options from the Google Sheet
+ */
+export const GetSheetCatalogResponse = zod.object({
+  "records": zod.array(zod.object({
+  "row": zod.number(),
+  "particle_type": zod.string(),
+  "reference": zod.string(),
+  "composition": zod.string(),
+  "mechanism": zod.string(),
+  "advantages": zod.string(),
+  "limitations": zod.string(),
+  "methodology": zod.string(),
+  "formulation_name": zod.string().nullable(),
+  "diseases": zod.array(zod.string()),
+  "routes": zod.array(zod.string()),
+  "cargos": zod.array(zod.string()),
+  "is_review": zod.boolean(),
+  "source_url": zod.string()
+})),
+  "options": zod.object({
+  "diseases": zod.array(zod.string()),
+  "routes": zod.array(zod.string()),
+  "cargos": zod.array(zod.string())
+}),
+  "updated_at": zod.string(),
+  "sheet_url": zod.string()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

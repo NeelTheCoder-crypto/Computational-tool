@@ -38,7 +38,8 @@ import type {
   OutcomeListResult,
   PaperListResult,
   RecommendationInput,
-  RecommendationResult
+  RecommendationResult,
+  SheetCatalog
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -67,6 +68,83 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetSheetCatalogUrl = () => {
+
+
+
+
+  return `/api/sheet`
+}
+
+/**
+ * @summary Read carrier records and options from the Google Sheet
+ */
+export const getSheetCatalog = async ( options?: RequestInit): Promise<SheetCatalog> => {
+
+  return customFetch<SheetCatalog>(getGetSheetCatalogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSheetCatalogQueryKey = () => {
+    return [
+    `/api/sheet`
+    ] as const;
+    }
+
+
+export const getGetSheetCatalogQueryOptions = <TData = Awaited<ReturnType<typeof getSheetCatalog>>, TError = ErrorType<ApiError>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSheetCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSheetCatalogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSheetCatalog>>> = ({ signal }) => getSheetCatalog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSheetCatalog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSheetCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof getSheetCatalog>>>
+export type GetSheetCatalogQueryError = ErrorType<ApiError>
+
+
+/**
+ * @summary Read carrier records and options from the Google Sheet
+ */
+
+export function useGetSheetCatalog<TData = Awaited<ReturnType<typeof getSheetCatalog>>, TError = ErrorType<ApiError>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSheetCatalog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSheetCatalogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getHealthCheckUrl = () => {
 

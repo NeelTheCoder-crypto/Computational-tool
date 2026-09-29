@@ -5,6 +5,37 @@
  * NANP Carrier Selection Platform API
  * OpenAPI spec version: 0.1.0
  */
+export interface SheetRecord {
+  row: number;
+  particle_type: string;
+  reference: string;
+  composition: string;
+  mechanism: string;
+  advantages: string;
+  limitations: string;
+  methodology: string;
+  /** @nullable */
+  formulation_name: string | null;
+  diseases: string[];
+  routes: string[];
+  cargos: string[];
+  is_review: boolean;
+  source_url: string;
+}
+
+export type SheetCatalogOptions = {
+  diseases: string[];
+  routes: string[];
+  cargos: string[];
+};
+
+export interface SheetCatalog {
+  records: SheetRecord[];
+  options: SheetCatalogOptions;
+  updated_at: string;
+  sheet_url: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
